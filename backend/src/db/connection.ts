@@ -20,12 +20,20 @@ function initializeTables() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS trips (
       id TEXT PRIMARY KEY,
+      name TEXT,
       destination TEXT NOT NULL,
       startDate TEXT,
       endDate TEXT,
+      numberOfDays INTEGER,
+      groupType TEXT,
+      numberOfPeople INTEGER,
+      tripGoal TEXT,
       tripType TEXT,
       style TEXT,
       budgetRange TEXT,
+      pace TEXT,
+      hasChildren INTEGER DEFAULT 0,
+      specialRequirements TEXT,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     )

@@ -10,12 +10,20 @@ export const TravelerSchema = z.object({
 
 // Trip schemas
 export const CreateTripSchema = z.object({
+  name: z.string().optional(),
   destination: z.string().min(2),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  numberOfDays: z.number().int().positive().optional(),
+  groupType: z.enum(["solo", "couple", "famille", "amis", "autre"]).optional(),
+  numberOfPeople: z.number().int().positive().optional(),
+  tripGoal: z.enum(["detente", "tourisme", "sport", "gastronomie", "culturel", "affaires", "autre"]).optional(),
   tripType: z.string().optional(),
   style: z.string().optional(),
   budgetRange: z.string().optional(),
+  pace: z.enum(["relax", "equilibre", "intensif"]).optional(),
+  hasChildren: z.boolean().optional(),
+  specialRequirements: z.string().optional(),
   travelers: z.array(TravelerSchema).optional(),
 });
 
@@ -23,12 +31,20 @@ export const UpdateTripSchema = CreateTripSchema.partial();
 
 export const TripSchema = z.object({
   id: z.string(),
+  name: z.string().nullable(),
   destination: z.string(),
   startDate: z.string().nullable(),
   endDate: z.string().nullable(),
+  numberOfDays: z.number().nullable(),
+  groupType: z.string().nullable(),
+  numberOfPeople: z.number().nullable(),
+  tripGoal: z.string().nullable(),
   tripType: z.string().nullable(),
   style: z.string().nullable(),
   budgetRange: z.string().nullable(),
+  pace: z.string().nullable(),
+  hasChildren: z.number().nullable(),
+  specialRequirements: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
   travelers: z.array(TravelerSchema).optional(),

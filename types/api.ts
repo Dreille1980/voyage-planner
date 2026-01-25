@@ -9,26 +9,46 @@ export interface Traveler {
   notes?: string;
 }
 
+export type GroupType = "solo" | "couple" | "famille" | "amis" | "autre";
+export type TripGoal = "detente" | "tourisme" | "sport" | "gastronomie" | "culturel" | "affaires" | "autre";
+export type Pace = "relax" | "equilibre" | "intensif";
+
 export interface Trip {
   id: string;
+  name: string | null;
   destination: string;
   startDate: string | null;
   endDate: string | null;
+  numberOfDays: number | null;
+  groupType: string | null;
+  numberOfPeople: number | null;
+  tripGoal: string | null;
   tripType: string | null;
   style: string | null;
   budgetRange: string | null;
+  pace: string | null;
+  hasChildren: number | null;
+  specialRequirements: string | null;
   createdAt: string;
   updatedAt: string;
   travelers?: Traveler[];
 }
 
 export interface CreateTripInput {
+  name?: string;
   destination: string;
   startDate?: string;
   endDate?: string;
+  numberOfDays?: number;
+  groupType?: GroupType;
+  numberOfPeople?: number;
+  tripGoal?: TripGoal;
   tripType?: string;
   style?: string;
   budgetRange?: string;
+  pace?: Pace;
+  hasChildren?: boolean;
+  specialRequirements?: string;
   travelers?: Traveler[];
 }
 

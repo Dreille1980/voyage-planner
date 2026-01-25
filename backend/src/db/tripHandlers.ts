@@ -15,18 +15,30 @@ export function createTrip(data: CreateTrip): Trip {
 
   // Insert trip
   const stmt = db.prepare(`
-    INSERT INTO trips (id, destination, startDate, endDate, tripType, style, budgetRange, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO trips (
+      id, name, destination, startDate, endDate, numberOfDays,
+      groupType, numberOfPeople, tripGoal, tripType, style, budgetRange,
+      pace, hasChildren, specialRequirements, createdAt, updatedAt
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
     id,
+    data.name || null,
     data.destination,
     data.startDate || null,
     data.endDate || null,
+    data.numberOfDays || null,
+    data.groupType || null,
+    data.numberOfPeople || null,
+    data.tripGoal || null,
     data.tripType || null,
     data.style || null,
     data.budgetRange || null,
+    data.pace || null,
+    data.hasChildren ? 1 : 0,
+    data.specialRequirements || null,
     timestamp,
     timestamp
   );
@@ -90,6 +102,10 @@ export function updateTrip(id: string, data: UpdateTrip): Trip | null {
   const fields: string[] = [];
   const values: any[] = [];
 
+  if (data.name !== undefined) {
+    fields.push("name = ?");
+    values.push(data.name || null);
+  }
   if (data.destination !== undefined) {
     fields.push("destination = ?");
     values.push(data.destination);
@@ -102,6 +118,22 @@ export function updateTrip(id: string, data: UpdateTrip): Trip | null {
     fields.push("endDate = ?");
     values.push(data.endDate || null);
   }
+  if (data.numberOfDays !== undefined) {
+    fields.push("numberOfDays = ?");
+    values.push(data.numberOfDays || null);
+  }
+  if (data.groupType !== undefined) {
+    fields.push("groupType = ?");
+    values.push(data.groupType || null);
+  }
+  if (data.numberOfPeople !== undefined) {
+    fields.push("numberOfPeople = ?");
+    values.push(data.numberOfPeople || null);
+  }
+  if (data.tripGoal !== undefined) {
+    fields.push("tripGoal = ?");
+    values.push(data.tripGoal || null);
+  }
   if (data.tripType !== undefined) {
     fields.push("tripType = ?");
     values.push(data.tripType || null);
@@ -113,6 +145,18 @@ export function updateTrip(id: string, data: UpdateTrip): Trip | null {
   if (data.budgetRange !== undefined) {
     fields.push("budgetRange = ?");
     values.push(data.budgetRange || null);
+  }
+  if (data.pace !== undefined) {
+    fields.push("pace = ?");
+    values.push(data.pace || null);
+  }
+  if (data.hasChildren !== undefined) {
+    fields.push("hasChildren = ?");
+    values.push(data.hasChildren ? 1 : 0);
+  }
+  if (data.specialRequirements !== undefined) {
+    fields.push("specialRequirements = ?");
+    values.push(data.specialRequirements || null);
   }
 
   fields.push("updatedAt = ?");
