@@ -11,7 +11,7 @@ function safeJsonParse<T>(raw: string): T {
 }
 
 // Helper pour calculer une deadline intelligente (not used currently - AI calculates deadlines)
-function calculateDeadline(startDate: string | undefined | null, daysBeforeDeparture: number): string | null {
+function calculateDeadline(startDate: string | null, daysBeforeDeparture: number): string | null {
   if (!startDate) return null;
   
   try {
