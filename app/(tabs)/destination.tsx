@@ -36,7 +36,12 @@ export default function DestinationScreen() {
       const data = await getDestinationInfo(currentTrip.id);
       setDestinationInfo(data);
     } catch (err) {
-      Alert.alert('Erreur', 'Impossible de charger les informations de destination');
+      // Ne pas afficher d'erreur si les infos n'existent pas encore (404)
+      const errorMessage = (err as Error).message;
+      if (!errorMessage.includes('404')) {
+        Alert.alert('Erreur', 'Impossible de charger les informations de destination');
+      }
+      setDestinationInfo(null);
     } finally {
       setLoading(false);
     }
