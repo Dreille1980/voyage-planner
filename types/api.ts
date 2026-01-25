@@ -54,11 +54,14 @@ export interface CreateTripInput {
 
 export interface UpdateTripInput extends Partial<CreateTripInput> {}
 
+export type ChecklistType = "preparatifs" | "bagage_soute" | "bagage_main";
+
 export interface ChecklistItem {
   id: string;
   label: string;
   checked: boolean;
   assignedToAgeGroup: string | null;
+  deadline: string | null;
   orderIndex: number;
 }
 
@@ -72,6 +75,7 @@ export interface ChecklistCategory {
 export interface Checklist {
   id: string;
   tripId: string;
+  checklistType: ChecklistType;
   createdAt: string;
   updatedAt: string;
   categories: ChecklistCategory[];
@@ -81,6 +85,7 @@ export interface UpdateChecklistItemInput {
   label?: string;
   checked?: boolean;
   assignedToAgeGroup?: string | null;
+  deadline?: string | null;
 }
 
 // AI Actions
@@ -108,6 +113,8 @@ export interface DestinationInfoSection {
 }
 
 export interface DestinationInfo {
+  id: string;
+  tripId: string;
   sections: DestinationInfoSection[];
   updatedAt: string;
 }

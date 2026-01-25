@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, Button, FlatList, TouchableOpacity, ActivityInd
 import { useRouter } from 'expo-router';
 import { getAllTrips } from '../../services/api';
 import type { Trip } from '../../types/api';
+import { useCurrentTrip } from '../../contexts/TripContext';
 
 export default function TripsScreen() {
   const router = useRouter();
+  const { currentTrip, setCurrentTrip } = useCurrentTrip();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,14 +30,18 @@ export default function TripsScreen() {
     }
   };
 
-  const renderTripItem = ({ item }: { item: Trip }) => (
-    <TouchableOpacity
-      style={styles.tripCard}
-      onPress={() => {
-        // TODO: Navigate to trip details
-        Alert.alert('Voyage', `${item.destination}`);
-      }}
-    >
+  const renderTripItem = ({ item }: { item: Trip }) => {
+    const isSelected = currentTrip?.id === item.id;
+    
+    return (
+      <TouchableOpacity
+        style={[styles.tripCard, isSelected && styles.tripCardSelected]}
+        onPress={() => {
+          setCurrentTrip(item);
+          Alert.alert('Voyage sélectionné', `${item.destination} est maintenant le voyage actif`);
+        }}
+      >
+        {isSelected && <View style={styles.selectedBadge}><Text style={styles.selectedBadgeText}>✓ Actif</Text></View>}
       <Text style={styles.tripDestination}>{item.destination}</Text>
       {item.startDate && item.endDate && (
         <Text style={styles.tripDates}>
@@ -50,8 +56,9 @@ export default function TripsScreen() {
           {item.travelers.length} voyageur{item.travelers.length > 1 ? 's' : ''}
         </Text>
       )}
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -174,6 +181,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    position: 'relative',
+  },
+  tripCardSelected: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    backgroundColor: '#f0f7ff',
+  },
+  selectedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  selectedBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   tripDestination: {
     fontSize: 18,

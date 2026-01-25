@@ -51,14 +51,16 @@ function initializeTables() {
     )
   `);
 
-  // Table: checklists (one per trip)
+  // Table: checklists (multiple per trip, one per type)
   db.exec(`
     CREATE TABLE IF NOT EXISTS checklists (
       id TEXT PRIMARY KEY,
-      tripId TEXT NOT NULL UNIQUE,
+      tripId TEXT NOT NULL,
+      checklistType TEXT NOT NULL,
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
-      FOREIGN KEY (tripId) REFERENCES trips(id) ON DELETE CASCADE
+      FOREIGN KEY (tripId) REFERENCES trips(id) ON DELETE CASCADE,
+      UNIQUE(tripId, checklistType)
     )
   `);
 
@@ -81,6 +83,7 @@ function initializeTables() {
       label TEXT NOT NULL,
       checked INTEGER DEFAULT 0,
       assignedToAgeGroup TEXT,
+      deadline TEXT,
       orderIndex INTEGER NOT NULL,
       FOREIGN KEY (categoryId) REFERENCES checklist_categories(id) ON DELETE CASCADE
     )

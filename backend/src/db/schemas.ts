@@ -50,12 +50,16 @@ export const TripSchema = z.object({
   travelers: z.array(TravelerSchema).optional(),
 });
 
+// Checklist types
+export const ChecklistTypeSchema = z.enum(["preparatifs", "bagage_soute", "bagage_main"]);
+
 // Checklist Item schema
 export const ChecklistItemSchema = z.object({
   id: z.string(),
   label: z.string(),
   checked: z.boolean(),
   assignedToAgeGroup: z.string().nullable(),
+  deadline: z.string().nullable(),
   orderIndex: z.number(),
 });
 
@@ -63,6 +67,7 @@ export const UpdateChecklistItemSchema = z.object({
   label: z.string().optional(),
   checked: z.boolean().optional(),
   assignedToAgeGroup: z.string().nullish(),
+  deadline: z.string().nullish(),
 });
 
 // Checklist Category schema
@@ -77,15 +82,32 @@ export const ChecklistCategorySchema = z.object({
 export const ChecklistSchema = z.object({
   id: z.string(),
   tripId: z.string(),
+  checklistType: ChecklistTypeSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
   categories: z.array(ChecklistCategorySchema),
+});
+
+// Destination Info schema
+export const DestinationInfoSectionSchema = z.object({
+  title: z.string(),
+  bullets: z.array(z.string()),
+});
+
+export const DestinationInfoSchema = z.object({
+  id: z.string(),
+  tripId: z.string(),
+  sections: z.array(DestinationInfoSectionSchema),
+  updatedAt: z.string(),
 });
 
 export type Traveler = z.infer<typeof TravelerSchema>;
 export type CreateTrip = z.infer<typeof CreateTripSchema>;
 export type UpdateTrip = z.infer<typeof UpdateTripSchema>;
 export type Trip = z.infer<typeof TripSchema>;
+export type ChecklistType = z.infer<typeof ChecklistTypeSchema>;
 export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
 export type ChecklistCategory = z.infer<typeof ChecklistCategorySchema>;
 export type Checklist = z.infer<typeof ChecklistSchema>;
+export type DestinationInfoSection = z.infer<typeof DestinationInfoSectionSchema>;
+export type DestinationInfo = z.infer<typeof DestinationInfoSchema>;

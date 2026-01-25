@@ -1,8 +1,10 @@
 import { Stack } from 'expo-router';
+import { TripProvider } from '../contexts/TripContext';
 
 export default function RootLayout() {
   return (
-    <Stack>
+    <TripProvider>
+      <Stack>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen 
@@ -12,6 +14,7 @@ export default function RootLayout() {
           presentation: 'modal'
         }} 
       />
-    </Stack>
+      </Stack>
+    </TripProvider>
   );
 }

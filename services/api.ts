@@ -4,6 +4,7 @@ import type {
   CreateTripInput,
   UpdateTripInput,
   Checklist,
+  ChecklistType,
   UpdateChecklistItemInput,
   ChecklistItem,
   AIRequest,
@@ -76,22 +77,17 @@ export async function deleteTrip(id: string): Promise<void> {
 
 // ===== CHECKLISTS =====
 
-export async function getChecklistByTripId(
+export async function getAllChecklistsForTrip(
   tripId: string
-): Promise<Checklist | null> {
-  try {
-    return await fetchAPI<Checklist>(`/trips/${tripId}/checklist`);
-  } catch (error) {
-    // Si la checklist n'existe pas (404), retourne null
-    if ((error as Error).message.includes("404")) {
-      return null;
-    }
-    throw error;
-  }
+): Promise<Checklist[]> {
+  return fetchAPI<Checklist[]>(`/trips/${tripId}/checklists`);
 }
 
-export async function generateChecklist(tripId: string): Promise<Checklist> {
-  return fetchAPI<Checklist>(`/trips/${tripId}/checklist/generate`, {
+export async function regenerateChecklist(
+  tripId: string,
+  checklistType: ChecklistType
+): Promise<Checklist> {
+  return fetchAPI<Checklist>(`/trips/${tripId}/checklists/${checklistType}/regenerate`, {
     method: "POST",
   });
 }
@@ -112,21 +108,34 @@ export async function deleteChecklistItem(itemId: string): Promise<void> {
   });
 }
 
+// ===== DESTINATION INFO =====
+
+export async function getDestinationInfo(
+  tripId: string
+): Promise<DestinationInfo | null> {
+  try {
+    return await fetchAPI<DestinationInfo>(`/trips/${tripId}/destination-info`);
+  } catch (error) {
+    // Si les infos n'existent pas (404), retourne null
+    if ((error as Error).message.includes("404")) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function regenerateDestinationInfo(tripId: string): Promise<DestinationInfo> {
+  return fetchAPI<DestinationInfo>(`/trips/${tripId}/destination-info/regenerate`, {
+    method: "POST",
+  });
+}
+
 // ===== AI =====
 
 export async function callAI(request: AIRequest): Promise<any> {
   return fetchAPI<any>("/ai", {
     method: "POST",
     body: JSON.stringify(request),
-  });
-}
-
-export async function getDestinationInfo(
-  destination: string
-): Promise<DestinationInfo> {
-  return callAI({
-    action: "destination_info",
-    tripProfile: { destination },
   });
 }
 

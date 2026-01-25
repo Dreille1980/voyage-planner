@@ -30,6 +30,7 @@ export const AiRequestSchema = z.object({
   action: ActionSchema,
   tripProfile: TripProfileSchema,
   question: z.string().optional(),
+  checklistType: z.enum(["preparatifs", "bagage_soute", "bagage_main"]).optional(),
 });
 
 export type AiRequest = z.infer<typeof AiRequestSchema>;

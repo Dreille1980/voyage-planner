@@ -1,37 +1,52 @@
 import { randomUUID } from "crypto";
 import { getDatabase } from "./connection";
-import type { Checklist, ChecklistCategory, ChecklistItem } from "./schemas";
+import type { Checklist, ChecklistCategory, ChecklistItem, ChecklistType } from "./schemas";
 
 // Helper to get current ISO timestamp
 function now() {
   return new Date().toISOString();
 }
 
-// Get checklist for a trip
-export function getChecklistByTripId(tripId: string): Checklist | null {
+// Get all checklists for a trip
+export function getAllChecklistsForTrip(tripId: string): Checklist[] {
   const db = getDatabase();
   
-  const checklist = db.prepare("SELECT * FROM checklists WHERE tripId = ?").get(tripId) as any;
+  const checklists = db.prepare("SELECT * FROM checklists WHERE tripId = ? ORDER BY checklistType").all(tripId) as any[];
+  
+  return checklists.map((checklist) => ({
+    id: checklist.id,
+    tripId: checklist.tripId,
+    checklistType: checklist.checklistType as ChecklistType,
+    createdAt: checklist.createdAt,
+    updatedAt: checklist.updatedAt,
+    categories: getCategoriesByChecklistId(checklist.id),
+  }));
+}
+
+// Get checklist by type
+export function getChecklistByType(tripId: string, checklistType: ChecklistType): Checklist | null {
+  const db = getDatabase();
+  
+  const checklist = db.prepare("SELECT * FROM checklists WHERE tripId = ? AND checklistType = ?").get(tripId, checklistType) as any;
   
   if (!checklist) return null;
-
-  const categories = getCategoriesByChecklistId(checklist.id);
 
   return {
     id: checklist.id,
     tripId: checklist.tripId,
+    checklistType: checklist.checklistType as ChecklistType,
     createdAt: checklist.createdAt,
     updatedAt: checklist.updatedAt,
-    categories,
+    categories: getCategoriesByChecklistId(checklist.id),
   };
 }
 
 // Create or replace checklist (from AI generation)
-export function saveChecklist(tripId: string, categories: any[]): Checklist {
+export function saveChecklist(tripId: string, checklistType: ChecklistType, categories: any[]): Checklist {
   const db = getDatabase();
   
   // Check if checklist exists
-  let checklist = db.prepare("SELECT * FROM checklists WHERE tripId = ?").get(tripId) as any;
+  let checklist = db.prepare("SELECT * FROM checklists WHERE tripId = ? AND checklistType = ?").get(tripId, checklistType) as any;
   
   if (checklist) {
     // Delete existing categories and items
@@ -50,11 +65,11 @@ export function saveChecklist(tripId: string, categories: any[]): Checklist {
     const timestamp = now();
     
     db.prepare(`
-      INSERT INTO checklists (id, tripId, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?)
-    `).run(id, tripId, timestamp, timestamp);
+      INSERT INTO checklists (id, tripId, checklistType, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, tripId, checklistType, timestamp, timestamp);
     
-    checklist = { id, tripId, createdAt: timestamp, updatedAt: timestamp };
+    checklist = { id, tripId, checklistType, createdAt: timestamp, updatedAt: timestamp };
   }
 
   // Insert categories and items
@@ -64,8 +79,8 @@ export function saveChecklist(tripId: string, categories: any[]): Checklist {
   `);
 
   const itemStmt = db.prepare(`
-    INSERT INTO checklist_items (id, categoryId, label, checked, assignedToAgeGroup, orderIndex)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO checklist_items (id, categoryId, label, checked, assignedToAgeGroup, deadline, orderIndex)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
   categories.forEach((category, catIndex) => {
@@ -79,18 +94,19 @@ export function saveChecklist(tripId: string, categories: any[]): Checklist {
         item.label,
         0, // unchecked by default
         item.assignedToAgeGroup || null,
+        item.deadline || null,
         itemIndex
       );
     });
   });
 
-  return getChecklistByTripId(tripId)!;
+  return getChecklistByType(tripId, checklistType)!;
 }
 
-// Update checklist item (toggle checked, edit label, etc.)
+// Update checklist item (toggle checked, edit label, deadline, etc.)
 export function updateChecklistItem(
   itemId: string,
-  updates: { label?: string; checked?: boolean; assignedToAgeGroup?: string | null }
+  updates: { label?: string; checked?: boolean; assignedToAgeGroup?: string | null; deadline?: string | null }
 ): ChecklistItem | null {
   const db = getDatabase();
   
@@ -108,6 +124,10 @@ export function updateChecklistItem(
   if (updates.assignedToAgeGroup !== undefined) {
     fields.push("assignedToAgeGroup = ?");
     values.push(updates.assignedToAgeGroup || null);
+  }
+  if (updates.deadline !== undefined) {
+    fields.push("deadline = ?");
+    values.push(updates.deadline || null);
   }
 
   if (fields.length === 0) return null;
@@ -131,6 +151,7 @@ export function updateChecklistItem(
     label: item.label,
     checked: item.checked === 1,
     assignedToAgeGroup: item.assignedToAgeGroup,
+    deadline: item.deadline,
     orderIndex: item.orderIndex,
   };
 }
@@ -140,6 +161,15 @@ export function deleteChecklistItem(itemId: string): boolean {
   const db = getDatabase();
   
   const result = db.prepare("DELETE FROM checklist_items WHERE id = ?").run(itemId);
+  
+  return result.changes > 0;
+}
+
+// Delete entire checklist
+export function deleteChecklist(checklistId: string): boolean {
+  const db = getDatabase();
+  
+  const result = db.prepare("DELETE FROM checklists WHERE id = ?").run(checklistId);
   
   return result.changes > 0;
 }
@@ -170,6 +200,7 @@ function getCategoriesByChecklistId(checklistId: string): ChecklistCategory[] {
         label: item.label,
         checked: item.checked === 1,
         assignedToAgeGroup: item.assignedToAgeGroup,
+        deadline: item.deadline,
         orderIndex: item.orderIndex,
       })),
     };
