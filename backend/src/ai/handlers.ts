@@ -18,7 +18,8 @@ function calculateDeadline(startDate: string | null, daysBeforeDeparture: number
     const departure = new Date(startDate);
     const deadline = new Date(departure);
     deadline.setDate(deadline.getDate() - daysBeforeDeparture);
-    return deadline.toISOString().split('T')[0]; // Format YYYY-MM-DD
+    const formatted = deadline.toISOString().split('T')[0];
+    return formatted || null; // Format YYYY-MM-DD
   } catch {
     return null;
   }
