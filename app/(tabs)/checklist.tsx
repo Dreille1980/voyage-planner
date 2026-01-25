@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { useCurrentTrip } from '../../contexts/TripContext';
 import { getAllChecklistsForTrip, regenerateChecklist, updateChecklistItem } from '../../services/api';
@@ -41,7 +41,12 @@ export default function ChecklistScreen() {
       const data = await getAllChecklistsForTrip(currentTrip.id);
       setChecklists(data);
     } catch (err) {
-      Alert.alert('Erreur', 'Impossible de charger les checklists');
+      // Ne pas afficher d'erreur si les checklists n'existent pas encore (404)
+      const errorMessage = (err as Error).message;
+      if (!errorMessage.includes('404')) {
+        Alert.alert('Erreur', 'Impossible de charger les checklists');
+      }
+      setChecklists([]);
     } finally {
       setLoading(false);
     }
