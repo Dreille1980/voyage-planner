@@ -1,10 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Button, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { getAllTrips } from '../../services/api';
 import type { Trip } from '../../types/api';
 import { useCurrentTrip } from '../../contexts/TripContext';
 import { useAuth } from '../../contexts/AuthContext';
+
+// Format date without timezone issues
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  // Force UTC interpretation to avoid timezone offset
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  return new Date(year, month, day).toLocaleDateString();
+}
 
 export default function TripsScreen() {
   const router = useRouter();
@@ -14,9 +24,12 @@ export default function TripsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadTrips();
-  }, []);
+  // Reload trips every time screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadTrips();
+    }, [])
+  );
 
   const loadTrips = async () => {
     try {
@@ -47,7 +60,7 @@ export default function TripsScreen() {
       <Text style={styles.tripDestination}>{item.destination}</Text>
       {item.startDate && item.endDate && (
         <Text style={styles.tripDates}>
-          {new Date(item.startDate).toLocaleDateString()} - {new Date(item.endDate).toLocaleDateString()}
+          {formatDate(item.startDate)} - {formatDate(item.endDate)}
         </Text>
       )}
       {item.tripType && (
