@@ -9,7 +9,7 @@ import { AiRequestSchema } from "./ai/schemas";
 import { handleAi } from "./ai/handlers";
 import { getDatabase } from "./db/connection";
 import { CreateTripSchema, UpdateTripSchema, UpdateChecklistItemSchema } from "./db/schemas";
-import { createTrip, getAllTrips, getTripById, updateTrip, deleteTrip } from "./db/tripHandlers";
+import { createTrip, getAllTripsForUser, getTripById, updateTrip, deleteTrip } from "./db/tripHandlers";
 // import { getAllChecklistsForTrip, getChecklistByType, saveChecklist, updateChecklistItem, deleteChecklistItem } from "./db/checklistHandlers";
 // import { getDestinationInfo, saveDestinationInfo } from "./db/destinationHandlers";
 import { requireAuth } from "./auth/middleware";
@@ -107,9 +107,12 @@ app.post("/ai", requireAuth, async (req, res) => {
 // === TRIPS CRUD ===
 
 // GET /trips - Get all trips for authenticated user
-app.get("/trips", requireAuth, async (_req, res) => {
+app.get("/trips", requireAuth, async (req, res) => {
   try {
-    const trips = await getAllTrips();
+    if (!req.user?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const trips = await getAllTripsForUser(req.user.userId);
     res.json(trips);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch trips", message: err.message });
@@ -132,8 +135,11 @@ app.get("/trips/:id", requireAuth, async (req, res) => {
 // POST /trips - Create new trip (with automatic checklist & destination info generation)
 app.post("/trips", requireAuth, async (req, res) => {
   try {
+    if (!req.user?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
     const data = CreateTripSchema.parse(req.body);
-    const trip = await createTrip(data);
+    const trip = await createTrip(data, req.user.userId);
 
     // Generate checklists and destination info asynchronously (don't block response)
     const tripProfile = {

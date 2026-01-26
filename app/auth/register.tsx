@@ -83,6 +83,8 @@ export default function RegisterScreen() {
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
+              textContentType="newPassword"
+              passwordRules="minlength: 8;"
               editable={!isLoading}
             />
           </View>
@@ -97,6 +99,7 @@ export default function RegisterScreen() {
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
+              textContentType="newPassword"
               editable={!isLoading}
             />
           </View>

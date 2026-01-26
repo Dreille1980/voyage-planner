@@ -12,7 +12,7 @@ function now() {
 }
 
 // Create a new trip
-export async function createTrip(data: CreateTrip): Promise<Trip> {
+export async function createTrip(data: CreateTrip, userId: string): Promise<Trip> {
   const db = getDatabase();
   const id = randomUUID();
   const timestamp = now();
@@ -30,7 +30,7 @@ export async function createTrip(data: CreateTrip): Promise<Trip> {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     `, [
       id,
-      'system', // TODO: Use actual userId from auth context
+      userId,
       data.name || null,
       data.destination,
       data.startDate || null,
@@ -113,8 +113,8 @@ export async function createTrip(data: CreateTrip): Promise<Trip> {
   return await getTripById(id) as Trip;
 }
 
-// Get all trips
-export async function getAllTrips(): Promise<Trip[]> {
+// Get all trips for a specific user
+export async function getAllTripsForUser(userId: string): Promise<Trip[]> {
   const db = getDatabase();
   
   if (usePostgres) {
@@ -133,8 +133,8 @@ export async function getAllTrips(): Promise<Trip[]> {
              special_requirements as "specialRequirements",
              created_at as "createdAt",
              updated_at as "updatedAt"
-      FROM trips ORDER BY created_at DESC
-    `);
+      FROM trips WHERE user_id = $1 ORDER BY created_at DESC
+    `, [userId]);
     
     const trips: Trip[] = [];
     for (const trip of result.rows) {
