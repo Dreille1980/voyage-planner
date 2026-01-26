@@ -1,4 +1,5 @@
 import config from "../config";
+import * as SecureStore from "expo-secure-store";
 import type {
   Trip,
   CreateTripInput,
@@ -13,19 +14,93 @@ import type {
 } from "../types/api";
 
 const API_URL = config.apiUrl;
+const TOKEN_KEY = "access_token";
+const REFRESH_TOKEN_KEY = "refresh_token";
 
-// Helper pour les requêtes
+// Helper pour obtenir le token
+async function getAccessToken(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch (error) {
+    console.error("Error getting access token:", error);
+    return null;
+  }
+}
+
+// Helper pour rafraîchir le token
+async function refreshAccessToken(): Promise<string | null> {
+  try {
+    const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
+      return null;
+    }
+
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    await SecureStore.setItemAsync(TOKEN_KEY, data.accessToken);
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, data.refreshToken);
+    return data.accessToken;
+  } catch (error) {
+    console.error("Error refreshing token:", error);
+    return null;
+  }
+}
+
+// Helper pour les requêtes avec auth automatique
 async function fetchAPI<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
+  const token = await getAccessToken();
+  
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });
+
+  // Si 401, essayer de rafraîchir le token et réessayer
+  if (response.status === 401 && endpoint !== "/auth/refresh") {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      // Retry avec le nouveau token
+      const retryResponse = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${newToken}`,
+          ...options?.headers,
+        },
+      });
+
+      if (!retryResponse.ok) {
+        const error = await retryResponse.json().catch(() => ({
+          error: "Request failed",
+        }));
+        throw new Error(error.error || `HTTP ${retryResponse.status}`);
+      }
+
+      if (retryResponse.status === 204) {
+        return undefined as T;
+      }
+
+      return retryResponse.json();
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({

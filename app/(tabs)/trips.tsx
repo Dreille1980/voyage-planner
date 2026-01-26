@@ -4,10 +4,12 @@ import { useRouter } from 'expo-router';
 import { getAllTrips } from '../../services/api';
 import type { Trip } from '../../types/api';
 import { useCurrentTrip } from '../../contexts/TripContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function TripsScreen() {
   const router = useRouter();
   const { currentTrip, setCurrentTrip } = useCurrentTrip();
+  const { user, logout } = useAuth();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,14 +80,40 @@ export default function TripsScreen() {
     );
   }
 
+  const handleLogout = async () => {
+    Alert.alert(
+      'Déconnexion',
+      'Voulez-vous vous déconnecter?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Déconnexion',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/auth/login');
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Mes Voyages</Text>
-        <Button 
-          title="+ Nouveau" 
-          onPress={() => router.push('/new-trip')}
-        />
+        <View>
+          <Text style={styles.title}>Mes Voyages</Text>
+          {user && <Text style={styles.userEmail}>{user.name}</Text>}
+        </View>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Text style={styles.logoutText}>Déconnexion</Text>
+          </TouchableOpacity>
+          <Button 
+            title="+ Nouveau" 
+            onPress={() => router.push('/new-trip')}
+          />
+        </View>
       </View>
 
       {trips.length === 0 ? (
@@ -137,6 +165,27 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  userEmail: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoutButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+  },
+  logoutText: {
+    fontSize: 14,
+    color: '#ff3b30',
+    fontWeight: '600',
   },
   loadingText: {
     marginTop: 10,
