@@ -107,9 +107,9 @@ app.post("/ai", requireAuth, async (req, res) => {
 // === TRIPS CRUD ===
 
 // GET /trips - Get all trips for authenticated user
-app.get("/trips", requireAuth, (_req, res) => {
+app.get("/trips", requireAuth, async (_req, res) => {
   try {
-    const trips = getAllTrips();
+    const trips = await getAllTrips();
     res.json(trips);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch trips", message: err.message });
@@ -117,9 +117,9 @@ app.get("/trips", requireAuth, (_req, res) => {
 });
 
 // GET /trips/:id - Get trip by ID
-app.get("/trips/:id", requireAuth, (req, res) => {
+app.get("/trips/:id", requireAuth, async (req, res) => {
   try {
-    const trip = getTripById(req.params.id);
+    const trip = await getTripById(req.params.id);
     if (!trip) {
       return res.status(404).json({ error: "Trip not found" });
     }
@@ -133,7 +133,7 @@ app.get("/trips/:id", requireAuth, (req, res) => {
 app.post("/trips", requireAuth, async (req, res) => {
   try {
     const data = CreateTripSchema.parse(req.body);
-    const trip = createTrip(data);
+    const trip = await createTrip(data);
 
     // Generate checklists and destination info asynchronously (don't block response)
     const tripProfile = {
@@ -181,10 +181,10 @@ app.post("/trips", requireAuth, async (req, res) => {
 });
 
 // PUT /trips/:id - Update trip
-app.put("/trips/:id", (req, res) => {
+app.put("/trips/:id", requireAuth, async (req, res) => {
   try {
     const data = UpdateTripSchema.parse(req.body);
-    const trip = updateTrip(req.params.id, data);
+    const trip = await updateTrip(req.params.id, data);
     if (!trip) {
       return res.status(404).json({ error: "Trip not found" });
     }
@@ -198,9 +198,9 @@ app.put("/trips/:id", (req, res) => {
 });
 
 // DELETE /trips/:id - Delete trip
-app.delete("/trips/:id", (req, res) => {
+app.delete("/trips/:id", requireAuth, async (req, res) => {
   try {
-    const success = deleteTrip(req.params.id);
+    const success = await deleteTrip(req.params.id);
     if (!success) {
       return res.status(404).json({ error: "Trip not found" });
     }
@@ -233,7 +233,7 @@ app.post("/trips/:tripId/checklists/:type/regenerate", async (req, res) => {
     }
 
     // Get trip info
-    const trip = getTripById(tripId);
+    const trip = await getTripById(tripId as string);
     if (!trip) {
       return res.status(404).json({ error: "Trip not found" });
     }
@@ -319,10 +319,10 @@ app.get("/trips/:tripId/destination-info", (req, res) => {
 // POST /trips/:tripId/destination-info/regenerate - Regenerate destination info
 app.post("/trips/:tripId/destination-info/regenerate", async (req, res) => {
   try {
-    const tripId = req.params.tripId;
+    const tripId = req.params.tripId as string;
     
     // Get trip info
-    const trip = getTripById(tripId);
+    const trip = await getTripById(tripId);
     if (!trip) {
       return res.status(404).json({ error: "Trip not found" });
     }
