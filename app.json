@@ -15,25 +15,21 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.votrecompagnie.voyageplanner",
-      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Cette app n'utilise pas la caméra",
-        "NSPhotoLibraryUsageDescription": "Cette app n'utilise pas vos photos"
-      }
+        "NSPhotoLibraryUsageDescription": "Cette app n'utilise pas vos photos",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.dreille.voyageplanner"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.votrecompagnie.voyageplanner",
-      "versionCode": 1,
       "permissions": [
         "INTERNET"
-      ],
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -42,10 +38,10 @@
       "expo-router"
     ],
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "3d13d7e7-adfb-4037-95e4-f8f10e6adfb6"
       }
-    },
-    "owner": "votre-username-expo"
+    }
   }
 }
