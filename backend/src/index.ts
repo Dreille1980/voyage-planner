@@ -119,7 +119,7 @@ app.get("/trips", requireAuth, async (_req, res) => {
 // GET /trips/:id - Get trip by ID
 app.get("/trips/:id", requireAuth, async (req, res) => {
   try {
-    const trip = await getTripById(req.params.id);
+    const trip = await getTripById(req.params.id as string);
     if (!trip) {
       return res.status(404).json({ error: "Trip not found" });
     }
@@ -185,7 +185,7 @@ app.post("/trips", requireAuth, async (req, res) => {
 app.put("/trips/:id", requireAuth, async (req, res) => {
   try {
     const data = UpdateTripSchema.parse(req.body);
-    const trip = await updateTrip(req.params.id, data);
+    const trip = await updateTrip(req.params.id as string, data);
     if (!trip) {
       return res.status(404).json({ error: "Trip not found" });
     }
@@ -201,7 +201,7 @@ app.put("/trips/:id", requireAuth, async (req, res) => {
 // DELETE /trips/:id - Delete trip
 app.delete("/trips/:id", requireAuth, async (req, res) => {
   try {
-    const success = await deleteTrip(req.params.id);
+    const success = await deleteTrip(req.params.id as string);
     if (!success) {
       return res.status(404).json({ error: "Trip not found" });
     }
