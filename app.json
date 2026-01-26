@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "voyage-planner",
+    "name": "Voyage Planner",
     "slug": "voyage-planner",
     "scheme": "voyageplanner",
     "version": "1.0.0",
@@ -14,13 +14,24 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.votrecompagnie.voyageplanner",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Cette app n'utilise pas la caméra",
+        "NSPhotoLibraryUsageDescription": "Cette app n'utilise pas vos photos"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "package": "com.votrecompagnie.voyageplanner",
+      "versionCode": 1,
+      "permissions": [
+        "INTERNET"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -29,6 +40,12 @@
     },
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
+    },
+    "owner": "votre-username-expo"
   }
 }

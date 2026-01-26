@@ -6,7 +6,16 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:ios:dev": "npx eas build --profile development --platform ios",
+    "build:ios:prod": "npx eas build --profile production --platform ios",
+    "build:android:dev": "npx eas build --profile development --platform android",
+    "build:android:prod": "npx eas build --profile production --platform android",
+    "submit:ios": "npx eas submit --platform ios",
+    "submit:android": "npx eas submit --platform android",
+    "backend:dev": "cd backend && npm run dev",
+    "backend:build": "cd backend && npm run build",
+    "generate:jwt": "node -e \"console.log('JWT_SECRET=' + require('crypto').randomBytes(32).toString('hex')); console.log('JWT_REFRESH_SECRET=' + require('crypto').randomBytes(32).toString('hex'))\""
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
