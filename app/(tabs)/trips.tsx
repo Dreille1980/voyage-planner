@@ -122,7 +122,21 @@ export default function TripsScreen() {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>❌ {error}</Text>
-        <Button title="Réessayer" onPress={loadTrips} />
+        <Text style={styles.errorHint}>
+          Si le token est expiré, déconnectez-vous et reconnectez-vous.
+        </Text>
+        <View style={styles.errorButtons}>
+          <Button title="Réessayer" onPress={loadTrips} />
+          <View style={{ width: 10 }} />
+          <Button 
+            title="Déconnexion" 
+            onPress={async () => {
+              await logout();
+              router.replace('/auth/login');
+            }}
+            color="#ff3b30"
+          />
+        </View>
       </View>
     );
   }
@@ -240,8 +254,22 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#ff3b30',
+    marginBottom: 10,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  errorHint: {
+    color: '#666',
     marginBottom: 20,
     textAlign: 'center',
+    fontSize: 14,
+    paddingHorizontal: 20,
+  },
+  errorButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyContainer: {
     flex: 1,
