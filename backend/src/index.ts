@@ -10,8 +10,8 @@ import { handleAi } from "./ai/handlers";
 import { getDatabase } from "./db/connection";
 import { CreateTripSchema, UpdateTripSchema, UpdateChecklistItemSchema } from "./db/schemas";
 import { createTrip, getAllTripsForUser, getTripById, updateTrip, deleteTrip } from "./db/tripHandlers";
-// import { getAllChecklistsForTrip, getChecklistByType, saveChecklist, updateChecklistItem, deleteChecklistItem } from "./db/checklistHandlers";
-// import { getDestinationInfo, saveDestinationInfo } from "./db/destinationHandlers";
+import { getAllChecklistsForTrip, getChecklistByType, saveChecklist, updateChecklistItem, deleteChecklistItem } from "./db/checklistHandlers";
+import { getDestinationInfo, saveDestinationInfo } from "./db/destinationHandlers";
 import { requireAuth } from "./auth/middleware";
 import {
   handleRegister,
@@ -156,27 +156,26 @@ app.post("/trips", requireAuth, async (req, res) => {
       })),
     };
 
-    // TODO: Re-enable checklist/destination generation after converting handlers
-    // Generate in background - don't await
-    // Promise.all([
-    //   // Generate 3 checklists
-    //   handleAi({ action: "generate_checklist", tripProfile, checklistType: "preparatifs" })
-    //     .then((result: any) => saveChecklist(trip.id, "preparatifs", result.categories))
-    //     .catch(err => console.error("Failed to generate preparatifs checklist:", err)),
-    //   
-    //   handleAi({ action: "generate_checklist", tripProfile, checklistType: "bagage_soute" })
-    //     .then((result: any) => saveChecklist(trip.id, "bagage_soute", result.categories))
-    //     .catch(err => console.error("Failed to generate bagage_soute checklist:", err)),
-    //   
-    //   handleAi({ action: "generate_checklist", tripProfile, checklistType: "bagage_main" })
-    //     .then((result: any) => saveChecklist(trip.id, "bagage_main", result.categories))
-    //     .catch(err => console.error("Failed to generate bagage_main checklist:", err)),
-    //   
-    //   // Generate destination info
-    //   handleAi({ action: "destination_info", tripProfile })
-    //     .then((result: any) => saveDestinationInfo(trip.id, { sections: result.sections }))
-    //     .catch(err => console.error("Failed to generate destination info:", err)),
-    // ]);
+    // Generate checklists and destination info in background - don't await
+    Promise.all([
+      // Generate 3 checklists
+      handleAi({ action: "generate_checklist", tripProfile, checklistType: "preparatifs" })
+        .then((result: any) => saveChecklist(trip.id, "preparatifs", result.categories))
+        .catch(err => console.error("Failed to generate preparatifs checklist:", err)),
+      
+      handleAi({ action: "generate_checklist", tripProfile, checklistType: "bagage_soute" })
+        .then((result: any) => saveChecklist(trip.id, "bagage_soute", result.categories))
+        .catch(err => console.error("Failed to generate bagage_soute checklist:", err)),
+      
+      handleAi({ action: "generate_checklist", tripProfile, checklistType: "bagage_main" })
+        .then((result: any) => saveChecklist(trip.id, "bagage_main", result.categories))
+        .catch(err => console.error("Failed to generate bagage_main checklist:", err)),
+      
+      // Generate destination info
+      handleAi({ action: "destination_info", tripProfile })
+        .then((result: any) => saveDestinationInfo(trip.id, { sections: result.sections }))
+        .catch(err => console.error("Failed to generate destination info:", err)),
+    ]);
 
     res.status(201).json(trip);
   } catch (err: any) {
@@ -217,18 +216,78 @@ app.delete("/trips/:id", requireAuth, async (req, res) => {
   }
 });
 
-// === CHECKLISTS === (TEMPORARILY DISABLED - need PostgreSQL conversion)
-// TODO: Convert checklistHandlers.ts and destinationHandlers.ts to support PostgreSQL
+// === CHECKLISTS ===
 
-// // GET /trips/:tripId/checklists - Get all checklists for a trip
-// app.get("/trips/:tripId/checklists", (req, res) => {
-//   try {
-//     const checklists = getAllChecklistsForTrip(req.params.tripId as string);
-//     res.json(checklists);
-//   } catch (err: any) {
-//     res.status(500).json({ error: "Failed to fetch checklists", message: err.message });
-//   }
-// });
+// GET /trips/:tripId/checklists - Get all checklists for a trip
+app.get("/trips/:tripId/checklists", requireAuth, async (req, res) => {
+  try {
+    const checklists = await getAllChecklistsForTrip(req.params.tripId as string);
+    res.json(checklists);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch checklists", message: err.message });
+  }
+});
+
+// GET /trips/:tripId/checklists/:type - Get specific checklist
+app.get("/trips/:tripId/checklists/:type", requireAuth, async (req, res) => {
+  try {
+    const checklist = await getChecklistByType(
+      req.params.tripId as string,
+      req.params.type as any
+    );
+    if (!checklist) {
+      return res.status(404).json({ error: "Checklist not found" });
+    }
+    res.json(checklist);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch checklist", message: err.message });
+  }
+});
+
+// PATCH /checklists/items/:itemId - Update checklist item
+app.patch("/checklists/items/:itemId", requireAuth, async (req, res) => {
+  try {
+    const updates = UpdateChecklistItemSchema.parse(req.body);
+    const item = await updateChecklistItem(req.params.itemId as string, updates);
+    if (!item) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+    res.json(item);
+  } catch (err: any) {
+    if (err instanceof ZodError) {
+      return res.status(400).json({ error: "Invalid request body", details: err.issues });
+    }
+    res.status(500).json({ error: "Failed to update item", message: err.message });
+  }
+});
+
+// DELETE /checklists/items/:itemId - Delete checklist item
+app.delete("/checklists/items/:itemId", requireAuth, async (req, res) => {
+  try {
+    const success = await deleteChecklistItem(req.params.itemId as string);
+    if (!success) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+    res.status(204).send();
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete item", message: err.message });
+  }
+});
+
+// === DESTINATION INFO ===
+
+// GET /trips/:tripId/destination - Get destination info
+app.get("/trips/:tripId/destination", requireAuth, async (req, res) => {
+  try {
+    const info = await getDestinationInfo(req.params.tripId as string);
+    if (!info) {
+      return res.status(404).json({ error: "Destination info not found" });
+    }
+    res.json(info);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch destination info", message: err.message });
+  }
+});
 
 const port = Number(process.env.PORT) || 3000;
 app.listen(port, () => {

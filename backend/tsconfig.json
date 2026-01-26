@@ -40,9 +40,5 @@
     "skipLibCheck": true,
 
     "esModuleInterop": true,
-  },
-  "exclude": [
-    "src/db/checklistHandlers.ts",
-    "src/db/destinationHandlers.ts"
-  ]
+  }
 }
