@@ -114,12 +114,14 @@ export default function NewTripScreen() {
         specialRequirements: specialRequirements.trim() || undefined,
       };
 
-      await createTrip(tripData);
+      const newTrip = await createTrip(tripData);
       Alert.alert('Succès', 'Voyage créé avec succès !', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
-      Alert.alert('Erreur', (error as Error).message);
+      console.error('Error creating trip:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create trip';
+      Alert.alert('Erreur', `Erreur lors de la création du voyage:\n\n${errorMessage}\n\nVérifiez que le backend est accessible.`);
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { ZodError } from "zod";
 
@@ -11,17 +12,50 @@ import { CreateTripSchema, UpdateTripSchema, UpdateChecklistItemSchema } from ".
 import { createTrip, getAllTrips, getTripById, updateTrip, deleteTrip } from "./db/tripHandlers";
 import { getAllChecklistsForTrip, getChecklistByType, saveChecklist, updateChecklistItem, deleteChecklistItem } from "./db/checklistHandlers";
 import { getDestinationInfo, saveDestinationInfo } from "./db/destinationHandlers";
+import { requireAuth } from "./auth/middleware";
+import {
+  handleRegister,
+  handleLogin,
+  handleRefreshToken,
+  handleGetProfile,
+  handleUpdateProfile,
+  handleChangePassword,
+} from "./auth/handlers";
 
 const app = express();
 
 // Initialize database on startup
 getDatabase();
 
+// Security headers
+app.use(helmet());
+
 // JSON body
 app.use(express.json({ limit: "1mb" }));
 
-// CORS (MVP: permissif; tu peux restreindre ensuite)
-app.use(cors());
+// CORS configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:8081",
+  process.env.FRONTEND_URL_PROD,
+  "http://localhost:19006", // Expo web
+  "http://localhost:19000", // Expo dev
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === "development") {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 // Rate limit (anti-abus)
 app.use(
@@ -38,8 +72,16 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+// === AUTHENTICATION ROUTES ===
+app.post("/auth/register", handleRegister);
+app.post("/auth/login", handleLogin);
+app.post("/auth/refresh", handleRefreshToken);
+app.get("/auth/profile", requireAuth, handleGetProfile);
+app.put("/auth/profile", requireAuth, handleUpdateProfile);
+app.post("/auth/change-password", requireAuth, handleChangePassword);
+
 // API AI
-app.post("/ai", async (req, res) => {
+app.post("/ai", requireAuth, async (req, res) => {
   try {
     const parsed = AiRequestSchema.parse(req.body);
     const result = await handleAi(parsed);
@@ -64,8 +106,8 @@ app.post("/ai", async (req, res) => {
 
 // === TRIPS CRUD ===
 
-// GET /trips - Get all trips
-app.get("/trips", (_req, res) => {
+// GET /trips - Get all trips for authenticated user
+app.get("/trips", requireAuth, (_req, res) => {
   try {
     const trips = getAllTrips();
     res.json(trips);
@@ -75,7 +117,7 @@ app.get("/trips", (_req, res) => {
 });
 
 // GET /trips/:id - Get trip by ID
-app.get("/trips/:id", (req, res) => {
+app.get("/trips/:id", requireAuth, (req, res) => {
   try {
     const trip = getTripById(req.params.id);
     if (!trip) {
@@ -88,7 +130,7 @@ app.get("/trips/:id", (req, res) => {
 });
 
 // POST /trips - Create new trip (with automatic checklist & destination info generation)
-app.post("/trips", async (req, res) => {
+app.post("/trips", requireAuth, async (req, res) => {
   try {
     const data = CreateTripSchema.parse(req.body);
     const trip = createTrip(data);
