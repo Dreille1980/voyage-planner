@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Button, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { getAllTrips } from '../../services/api';
+import { getAllTrips, deleteTrip } from '../../services/api';
 import type { Trip } from '../../types/api';
 import { useCurrentTrip } from '../../contexts/TripContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -45,33 +45,67 @@ export default function TripsScreen() {
     }
   };
 
+  const handleDeleteTrip = async (trip: Trip) => {
+    Alert.alert(
+      'Supprimer le voyage',
+      `Voulez-vous vraiment supprimer "${trip.destination}"?\n\nCette action est irréversible.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteTrip(trip.id);
+              if (currentTrip?.id === trip.id) {
+                setCurrentTrip(null);
+              }
+              await loadTrips();
+              Alert.alert('Succès', 'Voyage supprimé');
+            } catch (err) {
+              Alert.alert('Erreur', 'Impossible de supprimer le voyage');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderTripItem = ({ item }: { item: Trip }) => {
     const isSelected = currentTrip?.id === item.id;
     
     return (
-      <TouchableOpacity
-        style={[styles.tripCard, isSelected && styles.tripCardSelected]}
-        onPress={() => {
-          setCurrentTrip(item);
-          Alert.alert('Voyage sélectionné', `${item.destination} est maintenant le voyage actif`);
-        }}
-      >
-        {isSelected && <View style={styles.selectedBadge}><Text style={styles.selectedBadgeText}>✓ Actif</Text></View>}
-      <Text style={styles.tripDestination}>{item.destination}</Text>
-      {item.startDate && item.endDate && (
-        <Text style={styles.tripDates}>
-          {formatDate(item.startDate)} - {formatDate(item.endDate)}
-        </Text>
-      )}
-      {item.tripType && (
-        <Text style={styles.tripType}>{item.tripType}</Text>
-      )}
-      {item.travelers && item.travelers.length > 0 && (
-        <Text style={styles.tripTravelers}>
-          {item.travelers.length} voyageur{item.travelers.length > 1 ? 's' : ''}
-        </Text>
-      )}
-      </TouchableOpacity>
+      <View style={[styles.tripCard, isSelected && styles.tripCardSelected]}>
+        <TouchableOpacity
+          style={styles.tripContent}
+          onPress={() => {
+            setCurrentTrip(item);
+            Alert.alert('Voyage sélectionné', `${item.destination} est maintenant le voyage actif`);
+          }}
+        >
+          {isSelected && <View style={styles.selectedBadge}><Text style={styles.selectedBadgeText}>✓ Actif</Text></View>}
+          <Text style={styles.tripDestination}>{item.destination}</Text>
+          {item.startDate && item.endDate && (
+            <Text style={styles.tripDates}>
+              {formatDate(item.startDate)} - {formatDate(item.endDate)}
+            </Text>
+          )}
+          {item.tripType && (
+            <Text style={styles.tripType}>{item.tripType}</Text>
+          )}
+          {item.travelers && item.travelers.length > 0 && (
+            <Text style={styles.tripTravelers}>
+              {item.travelers.length} voyageur{item.travelers.length > 1 ? 's' : ''}
+            </Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteTrip(item)}
+        >
+          <Text style={styles.deleteButtonText}>🗑️ Supprimer</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -235,7 +269,6 @@ const styles = StyleSheet.create({
   },
   tripCard: {
     backgroundColor: '#fff',
-    padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     shadowColor: '#000',
@@ -243,12 +276,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    position: 'relative',
+    overflow: 'hidden',
   },
   tripCardSelected: {
     borderWidth: 2,
     borderColor: '#007AFF',
     backgroundColor: '#f0f7ff',
+  },
+  tripContent: {
+    padding: 16,
+    position: 'relative',
+  },
+  deleteButton: {
+    backgroundColor: '#ff3b30',
+    padding: 12,
+    alignItems: 'center',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   selectedBadge: {
     position: 'absolute',

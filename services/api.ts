@@ -189,7 +189,7 @@ export async function getDestinationInfo(
   tripId: string
 ): Promise<DestinationInfo | null> {
   try {
-    return await fetchAPI<DestinationInfo>(`/trips/${tripId}/destination-info`);
+    return await fetchAPI<DestinationInfo>(`/trips/${tripId}/destination`);
   } catch (error) {
     // Si les infos n'existent pas (404), retourne null
     if ((error as Error).message.includes("404")) {
@@ -200,7 +200,7 @@ export async function getDestinationInfo(
 }
 
 export async function regenerateDestinationInfo(tripId: string): Promise<DestinationInfo> {
-  return fetchAPI<DestinationInfo>(`/trips/${tripId}/destination-info/regenerate`, {
+  return fetchAPI<DestinationInfo>(`/trips/${tripId}/destination/regenerate`, {
     method: "POST",
   });
 }
