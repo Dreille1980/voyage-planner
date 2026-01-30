@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  Modal,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { createTrip } from '../../services/api';
 import type { CreateTripInput, GroupType, TripGoal, Pace } from '../../types/api';
 
@@ -25,12 +27,14 @@ export default function NewTripScreen() {
   const [name, setName] = useState('');
   const [destination, setDestination] = useState('');
   const [dateMode, setDateMode] = useState<DateMode>('exact');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [numberOfDays, setNumberOfDays] = useState('');
   const [numberOfPeople, setNumberOfPeople] = useState('');
-  const [groupType, setGroupType] = useState<GroupType | ''>('');
-  const [tripGoal, setTripGoal] = useState<TripGoal | ''>('');
+  const [groupTypes, setGroupTypes] = useState<GroupType[]>([]);
+  const [tripGoals, setTripGoals] = useState<TripGoal[]>([]);
   const [tripGoalOther, setTripGoalOther] = useState('');
   const [budgetRange, setBudgetRange] = useState('');
   const [pace, setPace] = useState<Pace | ''>('');
@@ -66,16 +70,16 @@ export default function NewTripScreen() {
         return;
       }
     } else if (currentStep === 3) {
-      if (!numberOfPeople || !groupType) {
-        Alert.alert('Erreur', 'Veuillez remplir le nombre de personnes et le type de groupe');
+      if (!numberOfPeople || groupTypes.length === 0) {
+        Alert.alert('Erreur', 'Veuillez remplir le nombre de personnes et sélectionner au moins un type de groupe');
         return;
       }
     } else if (currentStep === 4) {
-      if (!tripGoal) {
-        Alert.alert('Erreur', 'Veuillez sélectionner un objectif de voyage');
+      if (tripGoals.length === 0) {
+        Alert.alert('Erreur', 'Veuillez sélectionner au moins un objectif de voyage');
         return;
       }
-      if (tripGoal === 'autre' && !tripGoalOther.trim()) {
+      if (tripGoals.includes('autre') && !tripGoalOther.trim()) {
         Alert.alert('Erreur', 'Veuillez préciser l\'objectif du voyage');
         return;
       }
@@ -92,6 +96,22 @@ export default function NewTripScreen() {
     }
   };
 
+  const toggleGroupType = (type: GroupType) => {
+    setGroupTypes(prev => 
+      prev.includes(type) 
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
+  };
+
+  const toggleTripGoal = (goal: TripGoal) => {
+    setTripGoals(prev => 
+      prev.includes(goal) 
+        ? prev.filter(g => g !== goal)
+        : [...prev, goal]
+    );
+  };
+
   const handleSubmit = async () => {
     try {
       setLoading(true);
@@ -100,14 +120,19 @@ export default function NewTripScreen() {
         name: name.trim(),
         destination: destination.trim(),
         ...(dateMode === 'exact' && startDate && endDate
-          ? { startDate, endDate }
+          ? { 
+              startDate: startDate.toISOString().split('T')[0], 
+              endDate: endDate.toISOString().split('T')[0] 
+            }
           : {}),
         ...(dateMode === 'duration' && numberOfDays
           ? { numberOfDays: parseInt(numberOfDays) }
           : {}),
         numberOfPeople: numberOfPeople ? parseInt(numberOfPeople) : undefined,
-        groupType: groupType || undefined,
-        tripGoal: (tripGoal === 'autre' ? tripGoalOther : tripGoal) as TripGoal | undefined,
+        groupType: groupTypes.length > 0 ? groupTypes : undefined,
+        tripGoal: tripGoals.length > 0 
+          ? tripGoals.map(g => g === 'autre' ? tripGoalOther : g) as TripGoal[]
+          : undefined,
         budgetRange: budgetRange || undefined,
         pace: pace || undefined,
         hasChildren,
@@ -125,6 +150,15 @@ export default function NewTripScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return '';
+    return date.toLocaleDateString('fr-FR', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
   };
 
   const renderStepIndicator = () => (
@@ -156,12 +190,31 @@ export default function NewTripScreen() {
       />
 
       <Text style={styles.label}>Destination *</Text>
-      <TextInput
-        style={styles.input}
-        value={destination}
-        onChangeText={setDestination}
-        placeholder="Ex: Italie"
-        placeholderTextColor="#999"
+      <GooglePlacesAutocomplete
+        placeholder="Rechercher une ville..."
+        onPress={(data, details = null) => {
+          setDestination(data.description);
+        }}
+        query={{
+          key: 'YOUR_GOOGLE_PLACES_API_KEY',
+          language: 'fr',
+          types: '(cities)',
+        }}
+        fetchDetails={false}
+        styles={{
+          textInputContainer: styles.autocompleteContainer,
+          textInput: styles.autocompleteInput,
+          listView: styles.autocompleteList,
+          row: styles.autocompleteRow,
+          description: styles.autocompleteDescription,
+        }}
+        textInputProps={{
+          value: destination,
+          onChangeText: setDestination,
+          placeholderTextColor: '#999',
+        }}
+        enablePoweredByContainer={false}
+        debounce={300}
       />
     </View>
   );
@@ -195,22 +248,51 @@ export default function NewTripScreen() {
       {dateMode === 'exact' ? (
         <>
           <Text style={styles.label}>Date de début *</Text>
-          <TextInput
-            style={styles.input}
-            value={startDate}
-            onChangeText={setStartDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#999"
-          />
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowStartPicker(true)}
+          >
+            <Text style={startDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
+              {startDate ? formatDate(startDate) : 'Sélectionner une date'}
+            </Text>
+          </TouchableOpacity>
+          {showStartPicker && (
+            <DateTimePicker
+              value={startDate || new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, selectedDate) => {
+                setShowStartPicker(Platform.OS === 'ios');
+                if (selectedDate) {
+                  setStartDate(selectedDate);
+                }
+              }}
+            />
+          )}
 
           <Text style={styles.label}>Date de fin *</Text>
-          <TextInput
-            style={styles.input}
-            value={endDate}
-            onChangeText={setEndDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#999"
-          />
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowEndPicker(true)}
+          >
+            <Text style={endDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
+              {endDate ? formatDate(endDate) : 'Sélectionner une date'}
+            </Text>
+          </TouchableOpacity>
+          {showEndPicker && (
+            <DateTimePicker
+              value={endDate || startDate || new Date()}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              minimumDate={startDate || undefined}
+              onChange={(event, selectedDate) => {
+                setShowEndPicker(Platform.OS === 'ios');
+                if (selectedDate) {
+                  setEndDate(selectedDate);
+                }
+              }}
+            />
+          )}
         </>
       ) : (
         <>
@@ -242,7 +324,8 @@ export default function NewTripScreen() {
         placeholderTextColor="#999"
       />
 
-      <Text style={styles.label}>Type de groupe *</Text>
+      <Text style={styles.label}>Type de groupe * (sélection multiple)</Text>
+      <Text style={styles.subtitle}>Vous pouvez sélectionner plusieurs options</Text>
       <View style={styles.buttonGroup}>
         {[
           { value: 'solo', label: '🧍 Solo' },
@@ -255,14 +338,14 @@ export default function NewTripScreen() {
             key={option.value}
             style={[
               styles.optionButton,
-              groupType === option.value && styles.optionButtonSelected,
+              groupTypes.includes(option.value as GroupType) && styles.optionButtonSelected,
             ]}
-            onPress={() => setGroupType(option.value as GroupType)}
+            onPress={() => toggleGroupType(option.value as GroupType)}
           >
             <Text
               style={[
                 styles.optionButtonText,
-                groupType === option.value && styles.optionButtonTextSelected,
+                groupTypes.includes(option.value as GroupType) && styles.optionButtonTextSelected,
               ]}
             >
               {option.label}
@@ -275,8 +358,8 @@ export default function NewTripScreen() {
 
   const renderStep4 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>🎯 Objectif du voyage</Text>
-      <Text style={styles.subtitle}>Quel est le but principal de ce voyage ?</Text>
+      <Text style={styles.stepTitle}>🎯 Objectifs du voyage</Text>
+      <Text style={styles.subtitle}>Sélectionnez un ou plusieurs objectifs</Text>
 
       <View style={styles.buttonGroup}>
         {[
@@ -292,14 +375,14 @@ export default function NewTripScreen() {
             key={option.value}
             style={[
               styles.optionButton,
-              tripGoal === option.value && styles.optionButtonSelected,
+              tripGoals.includes(option.value as TripGoal) && styles.optionButtonSelected,
             ]}
-            onPress={() => setTripGoal(option.value as TripGoal)}
+            onPress={() => toggleTripGoal(option.value as TripGoal)}
           >
             <Text
               style={[
                 styles.optionButtonText,
-                tripGoal === option.value && styles.optionButtonTextSelected,
+                tripGoals.includes(option.value as TripGoal) && styles.optionButtonTextSelected,
               ]}
             >
               {option.label}
@@ -308,7 +391,7 @@ export default function NewTripScreen() {
         ))}
       </View>
 
-      {tripGoal === 'autre' && (
+      {tripGoals.includes('autre') && (
         <>
           <Text style={styles.label}>Précisez *</Text>
           <TextInput
@@ -395,16 +478,16 @@ export default function NewTripScreen() {
         <SummaryItem label="Nom" value={name} />
         <SummaryItem label="Destination" value={destination} />
         {dateMode === 'exact' && startDate && endDate && (
-          <SummaryItem label="Dates" value={`${startDate} → ${endDate}`} />
+          <SummaryItem label="Dates" value={`${formatDate(startDate)} → ${formatDate(endDate)}`} />
         )}
         {dateMode === 'duration' && numberOfDays && (
           <SummaryItem label="Durée" value={`${numberOfDays} jours`} />
         )}
         <SummaryItem label="Participants" value={`${numberOfPeople} personne(s)`} />
-        <SummaryItem label="Type de groupe" value={groupType} />
+        <SummaryItem label="Types de groupe" value={groupTypes.join(', ')} />
         <SummaryItem
-          label="Objectif"
-          value={tripGoal === 'autre' ? tripGoalOther : tripGoal}
+          label="Objectifs"
+          value={tripGoals.map(g => g === 'autre' ? tripGoalOther : g).join(', ')}
         />
         {budgetRange && <SummaryItem label="Budget" value={budgetRange} />}
         {pace && <SummaryItem label="Rythme" value={pace} />}
@@ -434,7 +517,7 @@ export default function NewTripScreen() {
 
       {renderStepIndicator()}
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
@@ -557,6 +640,42 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
+  },
+  autocompleteContainer: {
+    width: '100%',
+  },
+  autocompleteInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  autocompleteList: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  autocompleteRow: {
+    padding: 12,
+  },
+  autocompleteDescription: {
+    fontSize: 14,
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#000',
+  },
+  dateButtonPlaceholder: {
+    fontSize: 16,
+    color: '#999',
   },
   radioGroup: {
     marginBottom: 16,

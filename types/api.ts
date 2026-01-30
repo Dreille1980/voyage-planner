@@ -20,9 +20,9 @@ export interface Trip {
   startDate: string | null;
   endDate: string | null;
   numberOfDays: number | null;
-  groupType: string | null;
+  groupType: string[] | null;
   numberOfPeople: number | null;
-  tripGoal: string | null;
+  tripGoal: string[] | null;
   tripType: string | null;
   style: string | null;
   budgetRange: string | null;
@@ -40,9 +40,9 @@ export interface CreateTripInput {
   startDate?: string;
   endDate?: string;
   numberOfDays?: number;
-  groupType?: GroupType;
+  groupType?: GroupType[];
   numberOfPeople?: number;
-  tripGoal?: TripGoal;
+  tripGoal?: TripGoal[];
   tripType?: string;
   style?: string;
   budgetRange?: string;

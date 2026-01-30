@@ -36,9 +36,9 @@ export async function createTrip(data: CreateTrip, userId: string): Promise<Trip
       data.startDate || null,
       data.endDate || null,
       data.numberOfDays || null,
-      data.groupType || null,
+      data.groupType ? JSON.stringify(data.groupType) : null,
       data.numberOfPeople || null,
-      data.tripGoal || null,
+      data.tripGoal ? JSON.stringify(data.tripGoal) : null,
       data.tripType || null,
       data.style || null,
       data.budgetRange || null,
@@ -78,9 +78,9 @@ export async function createTrip(data: CreateTrip, userId: string): Promise<Trip
       data.startDate || null,
       data.endDate || null,
       data.numberOfDays || null,
-      data.groupType || null,
+      data.groupType ? JSON.stringify(data.groupType) : null,
       data.numberOfPeople || null,
-      data.tripGoal || null,
+      data.tripGoal ? JSON.stringify(data.tripGoal) : null,
       data.tripType || null,
       data.style || null,
       data.budgetRange || null,
@@ -140,6 +140,8 @@ export async function getAllTripsForUser(userId: string): Promise<Trip[]> {
     for (const trip of result.rows) {
       trips.push({
         ...trip,
+        groupType: trip.groupType ? JSON.parse(trip.groupType) : null,
+        tripGoal: trip.tripGoal ? JSON.parse(trip.tripGoal) : null,
         hasChildren: Boolean(trip.hasChildren),
         travelers: await getTravelersByTripId(trip.id),
       });
@@ -153,6 +155,8 @@ export async function getAllTripsForUser(userId: string): Promise<Trip[]> {
     for (const trip of trips) {
       result.push({
         ...trip,
+        groupType: trip.groupType ? JSON.parse(trip.groupType) : null,
+        tripGoal: trip.tripGoal ? JSON.parse(trip.tripGoal) : null,
         hasChildren: Boolean(trip.hasChildren),
         travelers: await getTravelersByTripId(trip.id),
       });
@@ -189,6 +193,8 @@ export async function getTripById(id: string): Promise<Trip | null> {
     const trip = result.rows[0];
     return {
       ...trip,
+      groupType: trip.groupType ? JSON.parse(trip.groupType) : null,
+      tripGoal: trip.tripGoal ? JSON.parse(trip.tripGoal) : null,
       hasChildren: Boolean(trip.hasChildren),
       travelers: await getTravelersByTripId(id),
     };
@@ -200,6 +206,8 @@ export async function getTripById(id: string): Promise<Trip | null> {
 
     return {
       ...trip,
+      groupType: trip.groupType ? JSON.parse(trip.groupType) : null,
+      tripGoal: trip.tripGoal ? JSON.parse(trip.tripGoal) : null,
       hasChildren: Boolean(trip.hasChildren),
       travelers: await getTravelersByTripId(id),
     };
@@ -244,7 +252,7 @@ export async function updateTrip(id: string, data: UpdateTrip): Promise<Trip | n
     }
     if (data.groupType !== undefined) {
       fields.push(`group_type = $${paramCount++}`);
-      values.push(data.groupType || null);
+      values.push(data.groupType ? JSON.stringify(data.groupType) : null);
     }
     if (data.numberOfPeople !== undefined) {
       fields.push(`number_of_people = $${paramCount++}`);
@@ -252,7 +260,7 @@ export async function updateTrip(id: string, data: UpdateTrip): Promise<Trip | n
     }
     if (data.tripGoal !== undefined) {
       fields.push(`trip_goal = $${paramCount++}`);
-      values.push(data.tripGoal || null);
+      values.push(data.tripGoal ? JSON.stringify(data.tripGoal) : null);
     }
     if (data.tripType !== undefined) {
       fields.push(`trip_type = $${paramCount++}`);
@@ -333,7 +341,7 @@ export async function updateTrip(id: string, data: UpdateTrip): Promise<Trip | n
     }
     if (data.groupType !== undefined) {
       fields.push("groupType = ?");
-      values.push(data.groupType || null);
+      values.push(data.groupType ? JSON.stringify(data.groupType) : null);
     }
     if (data.numberOfPeople !== undefined) {
       fields.push("numberOfPeople = ?");
@@ -341,7 +349,7 @@ export async function updateTrip(id: string, data: UpdateTrip): Promise<Trip | n
     }
     if (data.tripGoal !== undefined) {
       fields.push("tripGoal = ?");
-      values.push(data.tripGoal || null);
+      values.push(data.tripGoal ? JSON.stringify(data.tripGoal) : null);
     }
     if (data.tripType !== undefined) {
       fields.push("tripType = ?");
