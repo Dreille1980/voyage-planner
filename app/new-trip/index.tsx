@@ -36,12 +36,8 @@ export default function NewTripScreen() {
   const [groupTypes, setGroupTypes] = useState<GroupType[]>([]);
   const [tripGoals, setTripGoals] = useState<TripGoal[]>([]);
   const [tripGoalOther, setTripGoalOther] = useState('');
-  const [budgetRange, setBudgetRange] = useState('');
-  const [pace, setPace] = useState<Pace | ''>('');
-  const [hasChildren, setHasChildren] = useState(false);
-  const [specialRequirements, setSpecialRequirements] = useState('');
 
-  const totalSteps = 6;
+  const totalSteps = 5;
 
   const handleClose = () => {
     Alert.alert(
@@ -133,10 +129,6 @@ export default function NewTripScreen() {
         tripGoal: tripGoals.length > 0 
           ? tripGoals.map(g => g === 'autre' ? tripGoalOther : g) as TripGoal[]
           : undefined,
-        budgetRange: budgetRange || undefined,
-        pace: pace || undefined,
-        hasChildren,
-        specialRequirements: specialRequirements.trim() || undefined,
       };
 
       const newTrip = await createTrip(tripData);
@@ -408,70 +400,6 @@ export default function NewTripScreen() {
 
   const renderStep5 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>🏷️ Contraintes et préférences</Text>
-      <Text style={styles.subtitle}>Ces informations sont optionnelles</Text>
-
-      <Text style={styles.label}>Budget approximatif</Text>
-      <TextInput
-        style={styles.input}
-        value={budgetRange}
-        onChangeText={setBudgetRange}
-        placeholder="Ex: 1000-2000€"
-        placeholderTextColor="#999"
-      />
-
-      <Text style={styles.label}>Rythme souhaité</Text>
-      <View style={styles.buttonGroup}>
-        {[
-          { value: 'relax', label: '🛋️ Relax' },
-          { value: 'equilibre', label: '⚖️ Équilibré' },
-          { value: 'intensif', label: '🏃 Intensif' },
-        ].map((option) => (
-          <TouchableOpacity
-            key={option.value}
-            style={[
-              styles.optionButton,
-              pace === option.value && styles.optionButtonSelected,
-            ]}
-            onPress={() => setPace(option.value as Pace)}
-          >
-            <Text
-              style={[
-                styles.optionButtonText,
-                pace === option.value && styles.optionButtonTextSelected,
-              ]}
-            >
-              {option.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity
-        style={styles.checkboxContainer}
-        onPress={() => setHasChildren(!hasChildren)}
-      >
-        <View style={styles.checkbox}>
-          {hasChildren && <Text style={styles.checkmark}>✓</Text>}
-        </View>
-        <Text style={styles.checkboxLabel}>Présence d'enfants</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.label}>Restrictions particulières</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        value={specialRequirements}
-        onChangeText={setSpecialRequirements}
-        placeholder="Mobilité, alimentation, etc."
-        placeholderTextColor="#999"
-        multiline
-        numberOfLines={4}
-      />
-    </View>
-  );
-
-  const renderStep6 = () => (
-    <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>✅ Récapitulatif</Text>
 
       <View style={styles.summary}>
@@ -489,12 +417,6 @@ export default function NewTripScreen() {
           label="Objectifs"
           value={tripGoals.map(g => g === 'autre' ? tripGoalOther : g).join(', ')}
         />
-        {budgetRange && <SummaryItem label="Budget" value={budgetRange} />}
-        {pace && <SummaryItem label="Rythme" value={pace} />}
-        {hasChildren && <SummaryItem label="Enfants" value="Oui" />}
-        {specialRequirements && (
-          <SummaryItem label="Restrictions" value={specialRequirements} />
-        )}
       </View>
 
       <TouchableOpacity
@@ -523,7 +445,6 @@ export default function NewTripScreen() {
         {currentStep === 3 && renderStep3()}
         {currentStep === 4 && renderStep4()}
         {currentStep === 5 && renderStep5()}
-        {currentStep === 6 && renderStep6()}
       </ScrollView>
 
       <View style={styles.navigation}>
@@ -786,7 +707,9 @@ const styles = StyleSheet.create({
   navigation: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
