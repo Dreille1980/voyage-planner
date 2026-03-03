@@ -439,7 +439,11 @@ export default function NewTripScreen() {
 
       {renderStepIndicator()}
 
-      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
@@ -532,8 +536,12 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 0,
+  },
   stepContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   stepTitle: {
     fontSize: 24,
@@ -708,10 +716,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    backgroundColor: '#fff',
   },
   navButton: {
     flex: 1,
