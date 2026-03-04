@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { createTrip } from '../../services/api';
@@ -20,6 +21,7 @@ type DateMode = 'exact' | 'duration';
 
 export default function NewTripScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -451,7 +453,7 @@ export default function NewTripScreen() {
         {currentStep === 5 && renderStep5()}
       </ScrollView>
 
-      <View style={styles.navigation}>
+      <View style={[styles.navigation, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
         {currentStep > 1 && (
           <TouchableOpacity
             style={[styles.navButton, styles.navButtonSecondary]}
