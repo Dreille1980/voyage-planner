@@ -7,6 +7,18 @@ import { ZodError } from "zod";
 
 import { AiRequestSchema } from "./ai/schemas";
 import { handleAi } from "./ai/handlers";
+
+// Helper to extract user language from request headers
+function getUserLanguage(req: express.Request): "fr" | "en" | "es" | "de" {
+  const acceptLanguage = req.headers["accept-language"] || req.headers["x-user-language"] || "";
+  const langHeader = Array.isArray(acceptLanguage) ? acceptLanguage[0] : acceptLanguage;
+  const lang = (langHeader || "en").split(",")[0].split("-")[0].toLowerCase();
+  
+  if (lang === "fr" || lang === "en" || lang === "es" || lang === "de") {
+    return lang;
+  }
+  return "en"; // Default to English
+}
 import { getDatabase } from "./db/connection";
 import { CreateTripSchema, UpdateTripSchema, UpdateChecklistItemSchema } from "./db/schemas";
 import { createTrip, getAllTripsForUser, getTripById, updateTrip, deleteTrip } from "./db/tripHandlers";
@@ -142,6 +154,9 @@ app.post("/trips", requireAuth, async (req, res) => {
     const data = CreateTripSchema.parse(req.body);
     const trip = await createTrip(data, req.user.userId);
 
+    // Get user language
+    const userLanguage = getUserLanguage(req);
+
     // Generate checklists and destination info asynchronously (don't block response)
     const tripProfile = {
       destination: trip.destination,
@@ -160,20 +175,20 @@ app.post("/trips", requireAuth, async (req, res) => {
     // Generate checklists and destination info in background - don't await
     Promise.all([
       // Generate 3 checklists
-      handleAi({ action: "generate_checklist", tripProfile, checklistType: "preparatifs" })
+      handleAi({ action: "generate_checklist", tripProfile, checklistType: "preparatifs", userLanguage })
         .then((result: any) => saveChecklist(trip.id, "preparatifs", result.categories))
         .catch(err => console.error("Failed to generate preparatifs checklist:", err)),
       
-      handleAi({ action: "generate_checklist", tripProfile, checklistType: "bagage_soute" })
+      handleAi({ action: "generate_checklist", tripProfile, checklistType: "bagage_soute", userLanguage })
         .then((result: any) => saveChecklist(trip.id, "bagage_soute", result.categories))
         .catch(err => console.error("Failed to generate bagage_soute checklist:", err)),
       
-      handleAi({ action: "generate_checklist", tripProfile, checklistType: "bagage_main" })
+      handleAi({ action: "generate_checklist", tripProfile, checklistType: "bagage_main", userLanguage })
         .then((result: any) => saveChecklist(trip.id, "bagage_main", result.categories))
         .catch(err => console.error("Failed to generate bagage_main checklist:", err)),
       
       // Generate destination info
-      handleAi({ action: "destination_info", tripProfile })
+      handleAi({ action: "destination_info", tripProfile, userLanguage })
         .then((result: any) => saveDestinationInfo(trip.id, { sections: result.sections }))
         .catch(err => console.error("Failed to generate destination info:", err)),
     ]);
@@ -275,6 +290,53 @@ app.delete("/checklists/items/:itemId", requireAuth, async (req, res) => {
   }
 });
 
+// POST /trips/:tripId/checklists/:type/regenerate - Regenerate a checklist
+app.post("/trips/:tripId/checklists/:type/regenerate", requireAuth, async (req, res) => {
+  try {
+    const tripId = req.params.tripId as string;
+    const checklistType = req.params.type as "preparatifs" | "bagage_soute" | "bagage_main";
+
+    // Get trip details
+    const trip = await getTripById(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: "Trip not found" });
+    }
+
+    // Get user language
+    const userLanguage = getUserLanguage(req);
+
+    // Build trip profile
+    const tripProfile = {
+      destination: trip.destination,
+      startDate: trip.startDate || undefined,
+      endDate: trip.endDate || undefined,
+      tripType: trip.tripType || undefined,
+      style: trip.style || undefined,
+      budgetRange: trip.budgetRange || undefined,
+      travelers: trip.travelers?.map(t => ({
+        name: t.name,
+        ageGroup: t.ageGroup,
+        notes: t.notes,
+      })),
+    };
+
+    // Generate new checklist
+    const result = await handleAi({ 
+      action: "generate_checklist", 
+      tripProfile, 
+      checklistType, 
+      userLanguage 
+    });
+
+    // Save the regenerated checklist
+    const checklist = await saveChecklist(tripId, checklistType, result.categories);
+
+    res.json(checklist);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to regenerate checklist", message: err.message });
+  }
+});
+
 // === DESTINATION INFO ===
 
 // GET /trips/:tripId/destination - Get destination info
@@ -287,6 +349,51 @@ app.get("/trips/:tripId/destination", requireAuth, async (req, res) => {
     res.json(info);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch destination info", message: err.message });
+  }
+});
+
+// POST /trips/:tripId/destination/regenerate - Regenerate destination info
+app.post("/trips/:tripId/destination/regenerate", requireAuth, async (req, res) => {
+  try {
+    const tripId = req.params.tripId as string;
+
+    // Get trip details
+    const trip = await getTripById(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: "Trip not found" });
+    }
+
+    // Get user language
+    const userLanguage = getUserLanguage(req);
+
+    // Build trip profile
+    const tripProfile = {
+      destination: trip.destination,
+      startDate: trip.startDate || undefined,
+      endDate: trip.endDate || undefined,
+      tripType: trip.tripType || undefined,
+      style: trip.style || undefined,
+      budgetRange: trip.budgetRange || undefined,
+      travelers: trip.travelers?.map(t => ({
+        name: t.name,
+        ageGroup: t.ageGroup,
+        notes: t.notes,
+      })),
+    };
+
+    // Generate new destination info
+    const result = await handleAi({ 
+      action: "destination_info", 
+      tripProfile, 
+      userLanguage 
+    });
+
+    // Save the regenerated destination info
+    const destinationInfo = await saveDestinationInfo(tripId, { sections: result.sections });
+
+    res.json(destinationInfo);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to regenerate destination info", message: err.message });
   }
 });
 
@@ -351,6 +458,9 @@ app.post("/trips/:tripId/chat", requireAuth, async (req, res) => {
     // Save user message
     await saveChatMessage(tripId, "user", message.trim());
 
+    // Get user language
+    const userLanguage = getUserLanguage(req);
+
     // Get AI response
     const aiResponse = await handleAi({
       action: "trip_qna",
@@ -360,6 +470,7 @@ app.post("/trips/:tripId/chat", requireAuth, async (req, res) => {
         role: msg.role,
         content: msg.content,
       })),
+      userLanguage,
     });
 
     // Save assistant response

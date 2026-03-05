@@ -37,6 +37,7 @@ export const AiRequestSchema = z.object({
   question: z.string().optional(),
   checklistType: z.enum(["preparatifs", "bagage_soute", "bagage_main"]).optional(),
   conversationHistory: z.array(ChatMessageSchema).optional(),
+  userLanguage: z.enum(["fr", "en", "es", "de"]).default("en"),
 });
 
 export type AiRequest = z.infer<typeof AiRequestSchema>;

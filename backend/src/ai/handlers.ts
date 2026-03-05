@@ -26,11 +26,26 @@ function calculateDeadline(startDate: string | null, daysBeforeDeparture: number
   }
 }
 
+// Helper pour obtenir le nom de la langue en texte
+function getLanguageName(code: string): string {
+  const languages: Record<string, string> = {
+    fr: "French",
+    en: "English",
+    es: "Spanish",
+    de: "German",
+  };
+  return languages[code] || "English";
+}
+
 export async function handleAi(req: AiRequest) {
   const openai = getOpenAIClient();
 
   // Choisis un modèle. (Tu peux changer plus tard)
   const model = "gpt-4o-mini";
+  
+  // Récupérer la langue de l'utilisateur (par défaut: en)
+  const userLanguage = req.userLanguage || "en";
+  const languageName = getLanguageName(userLanguage);
 
   if (req.action === "generate_checklist") {
     const checklistType = req.checklistType || "bagage_soute"; // Default fallback
@@ -97,6 +112,8 @@ Keep it compact - only essential items for carry-on.
 You are generating a ${checklistType} checklist for a trip.
 Return STRICT JSON only. No markdown. No extra text.
 
+IMPORTANT: Generate ALL content (category names, item labels) in ${languageName}.
+
 Trip profile:
 ${JSON.stringify(req.tripProfile)}
 
@@ -106,10 +123,10 @@ Required JSON format:
 {
   "categories": [
     {
-      "name": "Category Name",
+      "name": "Category Name in ${languageName}",
       "items": [
         { 
-          "label": "Item description", 
+          "label": "Item description in ${languageName}", 
           "assignedToAgeGroup": "adult|teen|kid|baby|null",
           "deadline": "YYYY-MM-DD or null"
         }
@@ -125,6 +142,7 @@ Rules:
 - Avoid duplicates
 - If travelers include kids/baby, add family-appropriate items
 - Deadlines only for preparatifs type, null otherwise
+- ALL text content MUST be in ${languageName}
 `;
 
     const r = await openai.chat.completions.create({
@@ -143,58 +161,61 @@ Rules:
 You are generating comprehensive travel information for a destination.
 Return STRICT JSON only.
 
+IMPORTANT: Generate ALL content (section titles and bullets) in ${languageName}.
+
 Destination: ${req.tripProfile.destination}
 Trip dates: ${req.tripProfile.startDate || 'TBD'} to ${req.tripProfile.endDate || 'TBD'}
 
-Required JSON format:
+Required JSON format with EXACTLY 9 sections:
 {
   "sections": [
     { 
-      "title": "Choses importantes à savoir",
-      "bullets": ["Essential info 1", "Essential info 2", "..."]
+      "title": "Important things to know (in ${languageName})",
+      "bullets": ["Essential info 1 in ${languageName}", "Essential info 2", "..."]
     },
     {
-      "title": "Choses à éviter", 
+      "title": "Things to avoid (in ${languageName})", 
       "bullets": ["Avoid this", "Don't do that", "..."]
     },
     {
-      "title": "Faits intéressants",
+      "title": "Interesting facts (in ${languageName})",
       "bullets": ["Interesting fact 1", "Fun fact 2", "..."]
     },
     {
-      "title": "Météo habituelle",
+      "title": "Typical weather (in ${languageName})",
       "bullets": ["Climate info", "Best months", "What to expect", "..."]
     },
     {
-      "title": "Coutumes locales",
+      "title": "Local customs (in ${languageName})",
       "bullets": ["Cultural custom 1", "Etiquette 2", "..."]
     },
     {
-      "title": "Lois locales et règlements",
+      "title": "Local laws and regulations (in ${languageName})",
       "bullets": ["Legal requirement 1", "Restriction 2", "..."]
     },
     {
-      "title": "Sécurité",
+      "title": "Safety (in ${languageName})",
       "bullets": ["Safety tip 1", "Area to avoid", "Emergency numbers", "..."]
     },
     {
-      "title": "Transport",
+      "title": "Transportation (in ${languageName})",
       "bullets": ["Public transport", "Taxi tips", "Driving info", "..."]
     },
     {
-      "title": "Paiement et pourboires",
+      "title": "Payment and tips (in ${languageName})",
       "bullets": ["Currency", "Credit cards", "Tipping customs", "..."]
     }
   ]
 }
 
 Rules:
-- EXACTLY 9 sections as shown above (keep the order)
+- EXACTLY 9 sections in this order
 - 3 to 6 bullets per section
 - Bullets must be short, practical, and specific to the destination
 - Include actual useful information, not generic travel advice
 - Mention specific neighborhoods, customs, or local knowledge
 - Be concise and actionable
+- ALL text content (titles and bullets) MUST be in ${languageName}
 `;
 
     const r = await openai.chat.completions.create({
@@ -211,9 +232,36 @@ Rules:
   }
 
   if (req.action === "trip_qna") {
+    // Messages par défaut selon la langue
+    type LocalizedMessages = { empty: string; notRelevant: string; error: string };
+    const defaultMessages: Record<string, LocalizedMessages> = {
+      fr: {
+        empty: "Veuillez poser une question.",
+        notRelevant: "Je suis votre assistant de voyage et je peux uniquement répondre aux questions liées à votre voyage. Pourriez-vous me poser une question concernant votre destination, vos préparatifs ou tout autre aspect de votre voyage?",
+        error: "Désolé, je n'ai pas pu générer une réponse."
+      },
+      en: {
+        empty: "Please ask a question.",
+        notRelevant: "I am your travel assistant and can only answer questions related to your trip. Could you ask me a question about your destination, preparations, or any other aspect of your trip?",
+        error: "Sorry, I couldn't generate a response."
+      },
+      es: {
+        empty: "Por favor, haga una pregunta.",
+        notRelevant: "Soy su asistente de viaje y solo puedo responder preguntas relacionadas con su viaje. ¿Podría hacerme una pregunta sobre su destino, preparativos o cualquier otro aspecto de su viaje?",
+        error: "Lo siento, no pude generar una respuesta."
+      },
+      de: {
+        empty: "Bitte stellen Sie eine Frage.",
+        notRelevant: "Ich bin Ihr Reiseassistent und kann nur Fragen zu Ihrer Reise beantworten. Könnten Sie mir eine Frage zu Ihrem Reiseziel, Ihren Vorbereitungen oder einem anderen Aspekt Ihrer Reise stellen?",
+        error: "Entschuldigung, ich konnte keine Antwort generieren."
+      }
+    };
+
+    const localizedMessages: LocalizedMessages = (defaultMessages[userLanguage] || defaultMessages.en)!;
+
     const question = (req.question ?? "").trim();
     if (!question) {
-      return { answer: "Veuillez poser une question.", isRelevant: true };
+      return { answer: localizedMessages.empty, isRelevant: true };
     }
 
     // Build conversation history for context
@@ -249,16 +297,16 @@ Required JSON format:
       relevanceCheck.choices[0]?.message?.content ?? "{}"
     );
 
-    // If not relevant, return a polite message
+    // If not relevant, return a polite message in user's language
     if (!relevanceResult.isRelevant) {
       return {
-        answer: "Je suis votre assistant de voyage et je peux uniquement répondre aux questions liées à votre voyage. Pourriez-vous me poser une question concernant votre destination, vos préparatifs ou tout autre aspect de votre voyage?",
+        answer: localizedMessages.notRelevant,
         isRelevant: false,
       };
     }
 
     // Build messages for the conversation
-    const messages: any[] = [
+    const chatMessages: any[] = [
       {
         role: "system",
         content: `You are a helpful travel assistant. Answer questions about the user's trip to ${req.tripProfile.destination}.
@@ -266,33 +314,33 @@ Required JSON format:
 Trip details:
 ${JSON.stringify(req.tripProfile, null, 2)}
 
-Keep answers concise (max 150 words), practical, and friendly. Use French. Be specific to the destination and trip context.`,
+IMPORTANT: Answer in ${languageName}. Keep answers concise (max 150 words), practical, and friendly. Be specific to the destination and trip context.`,
       },
     ];
 
     // Add conversation history (last 10 messages for context)
     const recentHistory = conversationHistory.slice(-10);
     for (const msg of recentHistory) {
-      messages.push({
+      chatMessages.push({
         role: msg.role,
         content: msg.content,
       });
     }
 
     // Add current question
-    messages.push({
+    chatMessages.push({
       role: "user",
       content: question,
     });
 
     const r = await openai.chat.completions.create({
       model,
-      messages,
+      messages: chatMessages,
       temperature: 0.5,
       max_tokens: 300,
     });
 
-    const answer = r.choices[0]?.message?.content ?? "Désolé, je n'ai pas pu générer une réponse.";
+    const answer = r.choices[0]?.message?.content ?? localizedMessages.error;
 
     return { answer, isRelevant: true };
   }
