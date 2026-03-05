@@ -131,6 +131,18 @@ async function initializePostgresTables() {
       )
     `);
 
+    // Table: chat_messages (assistant conversations)
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id TEXT PRIMARY KEY,
+        trip_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log("✅ PostgreSQL tables initialized");
   } catch (error) {
     console.error("❌ Error initializing PostgreSQL tables:", error);
@@ -233,6 +245,18 @@ function initializeSQLiteTables() {
       tripId TEXT NOT NULL UNIQUE,
       content TEXT NOT NULL,
       updatedAt TEXT NOT NULL,
+      FOREIGN KEY (tripId) REFERENCES trips(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Table: chat_messages (assistant conversations)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      tripId TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
       FOREIGN KEY (tripId) REFERENCES trips(id) ON DELETE CASCADE
     )
   `);

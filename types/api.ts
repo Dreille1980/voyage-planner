@@ -123,3 +123,26 @@ export interface TripQnAResponse {
   answer: string;
   sources: string[];
 }
+
+// Chat assistant types
+export interface ChatMessage {
+  id: string;
+  tripId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+}
+
+export interface SendChatMessageResponse {
+  userMessage: {
+    role: "user";
+    content: string;
+  };
+  assistantMessage: {
+    role: "assistant";
+    content: string;
+    id: string;
+    createdAt: string;
+  };
+  isRelevant: boolean;
+}

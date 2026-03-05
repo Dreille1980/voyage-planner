@@ -12,6 +12,7 @@ import { CreateTripSchema, UpdateTripSchema, UpdateChecklistItemSchema } from ".
 import { createTrip, getAllTripsForUser, getTripById, updateTrip, deleteTrip } from "./db/tripHandlers";
 import { getAllChecklistsForTrip, getChecklistByType, saveChecklist, updateChecklistItem, deleteChecklistItem } from "./db/checklistHandlers";
 import { getDestinationInfo, saveDestinationInfo } from "./db/destinationHandlers";
+import { getChatMessages, saveChatMessage, getTodayMessageCount } from "./db/chatHandlers";
 import { requireAuth } from "./auth/middleware";
 import {
   handleRegister,
@@ -286,6 +287,100 @@ app.get("/trips/:tripId/destination", requireAuth, async (req, res) => {
     res.json(info);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch destination info", message: err.message });
+  }
+});
+
+// === CHAT ASSISTANT ===
+
+// GET /trips/:tripId/chat - Get all chat messages for a trip
+app.get("/trips/:tripId/chat", requireAuth, async (req, res) => {
+  try {
+    const messages = await getChatMessages(req.params.tripId as string);
+    res.json(messages);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch chat messages", message: err.message });
+  }
+});
+
+// POST /trips/:tripId/chat - Send a message and get AI response
+app.post("/trips/:tripId/chat", requireAuth, async (req, res) => {
+  try {
+    const tripId = req.params.tripId as string;
+    const { message } = req.body;
+
+    if (!message || typeof message !== "string" || !message.trim()) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    // Check daily limit (5 questions per day)
+    const todayCount = await getTodayMessageCount(tripId);
+    if (todayCount >= 5) {
+      return res.status(429).json({
+        error: "Limite quotidienne atteinte",
+        message: "Vous avez atteint la limite de 5 questions par jour pour ce voyage. Réessayez demain!",
+      });
+    }
+
+    // Get trip details
+    const trip = await getTripById(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: "Trip not found" });
+    }
+
+    // Get conversation history
+    const conversationHistory = await getChatMessages(tripId);
+
+    // Build trip profile
+    const tripProfile = {
+      destination: trip.destination,
+      startDate: trip.startDate || undefined,
+      endDate: trip.endDate || undefined,
+      tripType: trip.tripType || undefined,
+      style: trip.style || undefined,
+      budgetRange: trip.budgetRange || undefined,
+      numberOfPeople: trip.numberOfPeople || undefined,
+      pace: trip.pace || undefined,
+      tripGoal: trip.tripGoal ? JSON.parse(trip.tripGoal) : undefined,
+      travelers: trip.travelers?.map(t => ({
+        name: t.name,
+        ageGroup: t.ageGroup,
+        notes: t.notes,
+      })),
+    };
+
+    // Save user message
+    await saveChatMessage(tripId, "user", message.trim());
+
+    // Get AI response
+    const aiResponse = await handleAi({
+      action: "trip_qna",
+      tripProfile,
+      question: message.trim(),
+      conversationHistory: conversationHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      })),
+    });
+
+    // Save assistant response
+    const assistantMessage = await saveChatMessage(
+      tripId,
+      "assistant",
+      aiResponse.answer
+    );
+
+    res.json({
+      userMessage: { role: "user", content: message.trim() },
+      assistantMessage: {
+        role: "assistant",
+        content: aiResponse.answer,
+        id: assistantMessage.id,
+        createdAt: assistantMessage.createdAt,
+      },
+      isRelevant: aiResponse.isRelevant,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to process chat message", message: err.message });
   }
 });
 

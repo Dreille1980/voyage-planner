@@ -11,6 +11,8 @@ import type {
   AIRequest,
   DestinationInfo,
   TripQnAResponse,
+  ChatMessage,
+  SendChatMessageResponse,
 } from "../types/api";
 
 const API_URL = config.apiUrl;
@@ -222,6 +224,22 @@ export async function askTripQuestion(
     action: "trip_qna",
     tripProfile,
     question,
+  });
+}
+
+// ===== CHAT ASSISTANT =====
+
+export async function getChatMessages(tripId: string): Promise<ChatMessage[]> {
+  return fetchAPI<ChatMessage[]>(`/trips/${tripId}/chat`);
+}
+
+export async function sendChatMessage(
+  tripId: string,
+  message: string
+): Promise<SendChatMessageResponse> {
+  return fetchAPI<SendChatMessageResponse>(`/trips/${tripId}/chat`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
   });
 }
 

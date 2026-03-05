@@ -1,5 +1,6 @@
 import { getOpenAIClient } from "./openaiClient";
 import type { AiRequest } from "./schemas";
+import type { ChatMessage } from "../db/chatHandlers";
 
 // Petit helper pour forcer JSON strict
 function safeJsonParse<T>(raw: string): T {
@@ -212,39 +213,88 @@ Rules:
   if (req.action === "trip_qna") {
     const question = (req.question ?? "").trim();
     if (!question) {
-      return { answer: "Please provide a question.", sources: [] };
+      return { answer: "Veuillez poser une question.", isRelevant: true };
     }
 
-    const prompt = `
-You answer travel questions. Keep it short, practical, and specific.
+    // Build conversation history for context
+    const conversationHistory = req.conversationHistory || [];
+    
+    // First, check if the question is relevant to travel/trip
+    const relevancePrompt = `
+You are checking if a user's question is relevant to their travel plans.
 Return STRICT JSON only.
 
-Trip profile:
-${JSON.stringify(req.tripProfile)}
+Trip destination: ${req.tripProfile.destination}
+Question: ${question}
 
-Question:
-${question}
+Determine if this question is related to travel, the destination, trip planning, or tourism.
+Questions about the destination's culture, weather, safety, activities, food, transport, 
+accommodations, documents, health, packing, costs, etc. are relevant.
+Questions about completely unrelated topics (programming, sports scores, math problems, etc.) are not relevant.
 
 Required JSON format:
 {
-  "answer": "string",
-  "sources": ["official tourism", "government", "airline", "generic"]
+  "isRelevant": boolean
 }
-
-Rules:
-- answer max 80 words
-- sources are coarse labels (MVP), not URLs
 `;
+
+    const relevanceCheck = await openai.chat.completions.create({
+      model,
+      messages: [{ role: "user", content: relevancePrompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    });
+
+    const relevanceResult = safeJsonParse<{ isRelevant: boolean }>(
+      relevanceCheck.choices[0]?.message?.content ?? "{}"
+    );
+
+    // If not relevant, return a polite message
+    if (!relevanceResult.isRelevant) {
+      return {
+        answer: "Je suis votre assistant de voyage et je peux uniquement répondre aux questions liées à votre voyage. Pourriez-vous me poser une question concernant votre destination, vos préparatifs ou tout autre aspect de votre voyage?",
+        isRelevant: false,
+      };
+    }
+
+    // Build messages for the conversation
+    const messages: any[] = [
+      {
+        role: "system",
+        content: `You are a helpful travel assistant. Answer questions about the user's trip to ${req.tripProfile.destination}.
+
+Trip details:
+${JSON.stringify(req.tripProfile, null, 2)}
+
+Keep answers concise (max 150 words), practical, and friendly. Use French. Be specific to the destination and trip context.`,
+      },
+    ];
+
+    // Add conversation history (last 10 messages for context)
+    const recentHistory = conversationHistory.slice(-10);
+    for (const msg of recentHistory) {
+      messages.push({
+        role: msg.role,
+        content: msg.content,
+      });
+    }
+
+    // Add current question
+    messages.push({
+      role: "user",
+      content: question,
+    });
 
     const r = await openai.chat.completions.create({
       model,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.4,
+      messages,
+      temperature: 0.5,
+      max_tokens: 300,
     });
 
-    const content = r.choices[0]?.message?.content ?? "{}";
-    return safeJsonParse(content);
+    const answer = r.choices[0]?.message?.content ?? "Désolé, je n'ai pas pu générer une réponse.";
+
+    return { answer, isRelevant: true };
   }
 
   // fallback (normalement jamais atteint grâce à Zod)

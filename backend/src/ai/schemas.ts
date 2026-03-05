@@ -26,11 +26,17 @@ export const TripProfileSchema = z
   })
   .passthrough(); // permet d'ajouter d'autres champs plus tard sans casser
 
+export const ChatMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string(),
+});
+
 export const AiRequestSchema = z.object({
   action: ActionSchema,
   tripProfile: TripProfileSchema,
   question: z.string().optional(),
   checklistType: z.enum(["preparatifs", "bagage_soute", "bagage_main"]).optional(),
+  conversationHistory: z.array(ChatMessageSchema).optional(),
 });
 
 export type AiRequest = z.infer<typeof AiRequestSchema>;
