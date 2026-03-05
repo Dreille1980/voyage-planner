@@ -79,7 +79,7 @@ async function fetchAPI<T>(
   if (response.status === 401 && endpoint !== "/auth/refresh") {
     const newToken = await refreshAccessToken();
     if (newToken) {
-      // Retry avec le nouveau token
+      // Retry avec le nouveau token - IMPORTANT: garder toutes les options (method, body, etc.)
       const retryResponse = await fetch(`${API_URL}${endpoint}`, {
         ...options,
         headers: {
@@ -87,8 +87,6 @@ async function fetchAPI<T>(
           Authorization: `Bearer ${newToken}`,
           ...options?.headers,
         },
-        // Important: garder le body pour le retry
-        body: options?.body,
       });
 
       if (!retryResponse.ok) {
