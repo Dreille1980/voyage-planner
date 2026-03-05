@@ -87,6 +87,8 @@ async function fetchAPI<T>(
           Authorization: `Bearer ${newToken}`,
           ...options?.headers,
         },
+        // Important: garder le body pour le retry
+        body: options?.body,
       });
 
       if (!retryResponse.ok) {
@@ -108,7 +110,9 @@ async function fetchAPI<T>(
     const error = await response.json().catch(() => ({
       error: "Request failed",
     }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    console.error('API Error - Status:', response.status);
+    console.error('API Error - Body:', error);
+    throw new Error(error.error || error.message || `HTTP ${response.status}`);
   }
 
   // Pour les réponses 204 (No Content)

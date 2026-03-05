@@ -102,6 +102,10 @@ export default function AssistantScreen() {
       // Remove temp message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== tempUserMessage.id));
 
+      console.error('Chat error details:', error);
+      console.error('Error message:', error.message);
+      console.error('Error response:', error.response);
+
       if (error.message.includes('429')) {
         Alert.alert(
           'Limite atteinte',
@@ -111,7 +115,7 @@ export default function AssistantScreen() {
       } else {
         Alert.alert(
           'Erreur',
-          "Impossible d'envoyer le message. Veuillez réessayer.",
+          `Impossible d'envoyer le message: ${error.message || 'Erreur inconnue'}`,
           [{ text: 'OK' }]
         );
       }

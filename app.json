@@ -29,8 +29,10 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
+        "INTERNET",
         "INTERNET"
-      ]
+      ],
+      "package": "com.dreille.voyageplanner"
     },
     "web": {
       "favicon": "./assets/favicon.png"
