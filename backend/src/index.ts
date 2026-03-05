@@ -340,7 +340,7 @@ app.post("/trips/:tripId/chat", requireAuth, async (req, res) => {
       budgetRange: trip.budgetRange || undefined,
       numberOfPeople: trip.numberOfPeople || undefined,
       pace: trip.pace || undefined,
-      tripGoal: trip.tripGoal ? JSON.parse(trip.tripGoal) : undefined,
+      tripGoal: trip.tripGoal ? (typeof trip.tripGoal === 'string' ? JSON.parse(trip.tripGoal) : trip.tripGoal) : undefined,
       travelers: trip.travelers?.map(t => ({
         name: t.name,
         ageGroup: t.ageGroup,
