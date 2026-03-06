@@ -7,18 +7,6 @@ import { ZodError } from "zod";
 
 import { AiRequestSchema } from "./ai/schemas";
 import { handleAi } from "./ai/handlers";
-
-// Helper to extract user language from request headers
-function getUserLanguage(req: express.Request): "fr" | "en" | "es" | "de" {
-  const acceptLanguage = req.headers["accept-language"] || req.headers["x-user-language"] || "";
-  const langHeader = Array.isArray(acceptLanguage) ? acceptLanguage[0] : acceptLanguage;
-  const lang = (langHeader || "en").split(",")[0].split("-")[0].toLowerCase();
-  
-  if (lang === "fr" || lang === "en" || lang === "es" || lang === "de") {
-    return lang;
-  }
-  return "en"; // Default to English
-}
 import { getDatabase } from "./db/connection";
 import { CreateTripSchema, UpdateTripSchema, UpdateChecklistItemSchema } from "./db/schemas";
 import { createTrip, getAllTripsForUser, getTripById, updateTrip, deleteTrip } from "./db/tripHandlers";
@@ -34,6 +22,18 @@ import {
   handleUpdateProfile,
   handleChangePassword,
 } from "./auth/handlers";
+
+// Helper to extract user language from request headers
+function getUserLanguage(req: express.Request): "fr" | "en" | "es" | "de" {
+  const acceptLanguage = req.headers["accept-language"] || req.headers["x-user-language"] || "";
+  const langHeader = Array.isArray(acceptLanguage) ? (acceptLanguage[0] || "") : acceptLanguage;
+  const lang = langHeader.split(",")[0]?.split("-")[0]?.toLowerCase() || "en";
+  
+  if (lang === "fr" || lang === "en" || lang === "es" || lang === "de") {
+    return lang;
+  }
+  return "en"; // Default to English
+}
 
 const app = express();
 
