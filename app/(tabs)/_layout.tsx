@@ -1,18 +1,36 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, typography } from '../../theme';
 
 export default function TabsLayout() {
   return (
-    <Tabs>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
+        tabBarStyle: {
+          backgroundColor: colors.tabBarBackground,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          paddingBottom: 4,
+          paddingTop: 4,
+          height: 56,
+        },
+        tabBarLabelStyle: {
+          ...typography.labelSmall,
+          fontSize: 11,
+        },
+      }}
+    >
       <Tabs.Screen 
         name="trips" 
         options={{ 
           title: 'Voyages',
-          headerShown: true,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'briefcase' : 'briefcase-outline'} 
-              size={24} 
+              size={22} 
               color={color} 
             />
           ),
@@ -22,11 +40,10 @@ export default function TabsLayout() {
         name="checklist" 
         options={{ 
           title: 'Checklist',
-          headerShown: true,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'checkmark-done' : 'checkmark-done-outline'} 
-              size={24} 
+              size={22} 
               color={color} 
             />
           ),
@@ -36,11 +53,10 @@ export default function TabsLayout() {
         name="destination" 
         options={{ 
           title: 'Destination',
-          headerShown: true,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'map' : 'map-outline'} 
-              size={24} 
+              size={22} 
               color={color} 
             />
           ),
@@ -50,11 +66,10 @@ export default function TabsLayout() {
         name="assistant" 
         options={{ 
           title: 'Assistant',
-          headerShown: true,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'sparkles' : 'sparkles-outline'} 
-              size={24} 
+              size={22} 
               color={color} 
             />
           ),

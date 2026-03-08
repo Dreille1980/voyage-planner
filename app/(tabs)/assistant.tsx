@@ -11,21 +11,27 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useCurrentTrip } from '../../contexts/TripContext';
 import { getChatMessages, sendChatMessage } from '../../services/api';
 import type { ChatMessage } from '../../types/api';
+import { colors, typography, spacing, borderRadius, shadows, componentStyles } from '../../theme';
 
 const SUGGESTED_QUESTIONS = [
-  "Quelle est la meilleure période pour visiter?",
-  "Quels documents sont nécessaires?",
-  "Quel budget prévoir pour la nourriture?",
-  "Quels sont les endroits incontournables?",
-  "Comment se déplacer sur place?",
-  "Quelles sont les précautions sanitaires?",
+  'Quelle est la meilleure période pour visiter ?',
+  'Quels documents sont nécessaires ?',
+  'Quel budget prévoir pour la nourriture ?',
+  'Quels sont les endroits incontournables ?',
+  'Comment se déplacer sur place ?',
+  'Quelles sont les précautions sanitaires ?',
 ];
 
 export default function AssistantScreen() {
   const { currentTrip } = useCurrentTrip();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +65,6 @@ export default function AssistantScreen() {
     setInputText('');
     setIsLoading(true);
 
-    // Optimistically add user message to UI
     const tempUserMessage: ChatMessage = {
       id: `temp-${Date.now()}`,
       tripId: currentTrip.id,
@@ -72,7 +77,6 @@ export default function AssistantScreen() {
     try {
       const response = await sendChatMessage(currentTrip.id, userMessage);
 
-      // Replace temp message with real ones
       setMessages((prev) => {
         const filtered = prev.filter((msg) => msg.id !== tempUserMessage.id);
         return [
@@ -94,22 +98,16 @@ export default function AssistantScreen() {
         ];
       });
 
-      // Scroll to bottom after messages update
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error: any) {
-      // Remove temp message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== tempUserMessage.id));
-
-      console.error('Chat error details:', error);
-      console.error('Error message:', error.message);
-      console.error('Error response:', error.response);
 
       if (error.message.includes('429')) {
         Alert.alert(
           'Limite atteinte',
-          'Vous avez atteint la limite de 5 questions par jour pour ce voyage. Réessayez demain!',
+          'Vous avez atteint la limite de 5 questions par jour pour ce voyage. Réessayez demain !',
           [{ text: 'OK' }]
         );
       } else {
@@ -130,13 +128,18 @@ export default function AssistantScreen() {
 
   if (!currentTrip) {
     return (
-      <View style={styles.container}>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Aucun voyage sélectionné</Text>
-          <Text style={styles.emptyText}>
-            Sélectionnez un voyage pour commencer à poser des questions à votre assistant.
-          </Text>
-        </View>
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
+        <Ionicons name="briefcase-outline" size={56} color={colors.textTertiary} />
+        <Text style={styles.emptyTitle}>Aucun voyage sélectionné</Text>
+        <Text style={styles.emptySubtitle}>
+          Sélectionnez un voyage pour commencer à poser des questions à votre assistant.
+        </Text>
+        <TouchableOpacity
+          style={styles.goToTripsButton}
+          onPress={() => router.navigate('/(tabs)/trips')}
+        >
+          <Text style={styles.goToTripsText}>Aller aux voyages</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -147,10 +150,20 @@ export default function AssistantScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Assistant de Voyage</Text>
-        <Text style={styles.headerSubtitle}>{currentTrip.destination}</Text>
-        <Text style={styles.limitText}>5 questions par jour maximum</Text>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+        <View>
+          <Text style={styles.headerTitle}>Assistant IA</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.tripBadge}>
+              <Ionicons name="location" size={14} color={colors.primary} />
+              <Text style={styles.tripBadgeText}>{currentTrip.destination}</Text>
+            </View>
+            <View style={styles.limitBadge}>
+              <Ionicons name="chatbubbles-outline" size={12} color={colors.textTertiary} />
+              <Text style={styles.limitText}>5/jour max</Text>
+            </View>
+          </View>
+        </View>
       </View>
 
       <ScrollView
@@ -158,31 +171,36 @@ export default function AssistantScreen() {
         style={styles.messagesContainer}
         contentContainerStyle={styles.messagesContent}
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+        showsVerticalScrollIndicator={false}
       >
         {isFetchingHistory ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <>
             {messages.length === 0 && (
               <View style={styles.welcomeContainer}>
-                <Text style={styles.welcomeTitle}>👋 Bonjour!</Text>
+                <View style={styles.welcomeIconContainer}>
+                  <Ionicons name="sparkles" size={32} color={colors.primary} />
+                </View>
+                <Text style={styles.welcomeTitle}>Bonjour ! 👋</Text>
                 <Text style={styles.welcomeText}>
-                  Je suis votre assistant de voyage pour {currentTrip.destination}.
-                  Posez-moi vos questions!
+                  Je suis votre assistant de voyage pour {currentTrip.destination}. Posez-moi vos questions !
                 </Text>
 
                 <View style={styles.suggestionsContainer}>
-                  <Text style={styles.suggestionsTitle}>Questions suggérées:</Text>
+                  <Text style={styles.suggestionsTitle}>💡 Questions suggérées</Text>
                   {SUGGESTED_QUESTIONS.map((question, index) => (
                     <TouchableOpacity
                       key={index}
                       style={styles.suggestionButton}
                       onPress={() => handleSuggestedQuestion(question)}
                       disabled={isLoading}
+                      activeOpacity={0.7}
                     >
                       <Text style={styles.suggestionText}>{question}</Text>
+                      <Ionicons name="arrow-forward" size={14} color={colors.primary} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -197,31 +215,47 @@ export default function AssistantScreen() {
                   message.role === 'user' ? styles.userBubble : styles.assistantBubble,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.messageText,
-                    message.role === 'user' ? styles.userText : styles.assistantText,
-                  ]}
-                >
-                  {message.content}
-                </Text>
-                <Text
-                  style={[
-                    styles.messageTime,
-                    message.role === 'user' ? styles.userTime : styles.assistantTime,
-                  ]}
-                >
-                  {new Date(message.createdAt).toLocaleTimeString('fr-FR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
+                {message.role === 'assistant' && (
+                  <View style={styles.assistantAvatar}>
+                    <Ionicons name="sparkles" size={12} color={colors.primary} />
+                  </View>
+                )}
+                <View style={[
+                  styles.bubbleContent,
+                  message.role === 'user' ? styles.userBubbleContent : styles.assistantBubbleContent,
+                ]}>
+                  <Text
+                    style={[
+                      styles.messageText,
+                      message.role === 'user' ? styles.userText : styles.assistantText,
+                    ]}
+                  >
+                    {message.content}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.messageTime,
+                      message.role === 'user' ? styles.userTime : styles.assistantTime,
+                    ]}
+                  >
+                    {new Date(message.createdAt).toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
               </View>
             ))}
 
             {isLoading && (
               <View style={[styles.messageBubble, styles.assistantBubble]}>
-                <ActivityIndicator size="small" color="#666" />
+                <View style={styles.assistantAvatar}>
+                  <Ionicons name="sparkles" size={12} color={colors.primary} />
+                </View>
+                <View style={[styles.bubbleContent, styles.assistantBubbleContent, styles.typingBubble]}>
+                  <ActivityIndicator size="small" color={colors.textTertiary} />
+                  <Text style={styles.typingText}>Réflexion en cours...</Text>
+                </View>
               </View>
             )}
           </>
@@ -234,7 +268,7 @@ export default function AssistantScreen() {
           value={inputText}
           onChangeText={setInputText}
           placeholder="Posez votre question..."
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.textTertiary}
           multiline
           maxLength={500}
           editable={!isLoading}
@@ -245,7 +279,11 @@ export default function AssistantScreen() {
           onPress={handleSendMessage}
           disabled={!inputText.trim() || isLoading}
         >
-          <Text style={styles.sendButtonText}>➤</Text>
+          <Ionicons
+            name="send"
+            size={18}
+            color={!inputText.trim() || isLoading ? colors.textTertiary : colors.textInverse}
+          />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -255,168 +293,246 @@ export default function AssistantScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.background,
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xxxxl,
+    backgroundColor: colors.background,
+  },
+
+  // Header
   header: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    ...componentStyles.screenHeader,
+    paddingBottom: spacing.lg,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    ...typography.h1,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  tripBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primarySurface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.pill,
+    gap: spacing.xs,
+  },
+  tripBadgeText: {
+    ...typography.labelSmall,
+    color: colors.primary,
+  },
+  limitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.pill,
+    gap: spacing.xs,
   },
   limitText: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
-    fontStyle: 'italic',
+    ...typography.caption,
+    color: colors.textTertiary,
   },
+
+  // Empty
+  emptyTitle: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  emptySubtitle: {
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xxl,
+  },
+  goToTripsButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  goToTripsText: {
+    ...typography.labelMedium,
+    color: colors.textInverse,
+  },
+
+  // Messages
   messagesContainer: {
     flex: 1,
   },
   messagesContent: {
-    padding: 16,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: spacing.xxxxl,
   },
+
+  // Welcome
   welcomeContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: spacing.xl,
+  },
+  welcomeIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.primarySurface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   welcomeTitle: {
-    fontSize: 32,
-    marginBottom: 12,
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   welcomeText: {
-    fontSize: 16,
-    color: '#666',
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 20,
+    marginBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
   },
   suggestionsContainer: {
     width: '100%',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   suggestionsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+    ...typography.labelMedium,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
   suggestionButton: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.borderLight,
   },
   suggestionText: {
-    fontSize: 14,
-    color: '#007AFF',
+    ...typography.bodySmall,
+    color: colors.primary,
+    flex: 1,
   },
+
+  // Message bubbles
   messageBubble: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 12,
+    flexDirection: 'row',
+    marginBottom: spacing.md,
   },
   userBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#007AFF',
-    borderBottomRightRadius: 4,
+    justifyContent: 'flex-end',
   },
   assistantBubble: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
+    justifyContent: 'flex-start',
+  },
+  assistantAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primarySurface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  bubbleContent: {
+    maxWidth: '78%',
+    padding: spacing.md,
+    borderRadius: borderRadius.xl,
+  },
+  userBubbleContent: {
+    backgroundColor: colors.primary,
+    borderBottomRightRadius: spacing.xs,
+  },
+  assistantBubbleContent: {
+    backgroundColor: colors.surface,
+    borderBottomLeftRadius: spacing.xs,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.borderLight,
   },
   messageText: {
-    fontSize: 15,
-    lineHeight: 20,
+    ...typography.bodyMedium,
   },
   userText: {
-    color: '#fff',
+    color: colors.textInverse,
   },
   assistantText: {
-    color: '#333',
+    color: colors.textPrimary,
   },
   messageTime: {
+    ...typography.caption,
+    marginTop: spacing.xs,
     fontSize: 11,
-    marginTop: 4,
   },
   userTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.65)',
     textAlign: 'right',
   },
   assistantTime: {
-    color: '#999',
+    color: colors.textTertiary,
   },
+  typingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  typingText: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+  },
+
+  // Input
   inputContainer: {
     flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#fff',
+    padding: spacing.md,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: colors.border,
     alignItems: 'flex-end',
   },
   input: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 8,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginRight: spacing.sm,
     maxHeight: 100,
-    fontSize: 15,
-    color: '#333',
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
   },
   sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: '#CCC',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    backgroundColor: colors.surfaceSecondary,
   },
 });

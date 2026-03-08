@@ -1,6 +1,8 @@
 import { Redirect } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, typography, spacing } from '../theme';
 
 export default function Index() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -8,7 +10,10 @@ export default function Index() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <View style={styles.logoCircle}>
+          <Ionicons name="airplane" size={36} color={colors.textInverse} />
+        </View>
+        <ActivityIndicator size="large" color={colors.primary} style={styles.spinner} />
       </View>
     );
   }
@@ -25,6 +30,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
+  },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spinner: {
+    marginTop: spacing.xxl,
   },
 });

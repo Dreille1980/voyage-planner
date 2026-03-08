@@ -1,30 +1,90 @@
-import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Button, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useState, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Animated,
+} from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAllTrips, deleteTrip } from '../../services/api';
 import type { Trip } from '../../types/api';
 import { useCurrentTrip } from '../../contexts/TripContext';
 import { useAuth } from '../../contexts/AuthContext';
+import ActionMenu from '../../components/ActionMenu';
+import Toast from '../../components/Toast';
+import { colors, typography, spacing, borderRadius, shadows, componentStyles } from '../../theme';
 
-// Format date without timezone issues
+// Emoji flags for common destinations
+const DESTINATION_EMOJIS: { [key: string]: string } = {
+  'france': '🇫🇷', 'paris': '🇫🇷', 'italie': '🇮🇹', 'italy': '🇮🇹', 'rome': '🇮🇹',
+  'espagne': '🇪🇸', 'spain': '🇪🇸', 'barcelone': '🇪🇸', 'japon': '🇯🇵', 'japan': '🇯🇵',
+  'tokyo': '🇯🇵', 'portugal': '🇵🇹', 'lisbonne': '🇵🇹', 'grèce': '🇬🇷', 'greece': '🇬🇷',
+  'mexique': '🇲🇽', 'mexico': '🇲🇽', 'maroc': '🇲🇦', 'morocco': '🇲🇦',
+  'thaïlande': '🇹🇭', 'thailand': '🇹🇭', 'bangkok': '🇹🇭',
+  'états-unis': '🇺🇸', 'usa': '🇺🇸', 'new york': '🇺🇸', 'canada': '🇨🇦',
+  'allemagne': '🇩🇪', 'germany': '🇩🇪', 'berlin': '🇩🇪',
+  'royaume-uni': '🇬🇧', 'angleterre': '🇬🇧', 'london': '🇬🇧', 'londres': '🇬🇧',
+  'cuba': '🇨🇺', 'colombie': '🇨🇴', 'pérou': '🇵🇪', 'brésil': '🇧🇷', 'brazil': '🇧🇷',
+  'australie': '🇦🇺', 'australia': '🇦🇺',
+  'croatie': '🇭🇷', 'croatia': '🇭🇷',
+  'islande': '🇮🇸', 'iceland': '🇮🇸',
+  'turquie': '🇹🇷', 'turkey': '🇹🇷', 'istanbul': '🇹🇷',
+};
+
+function getDestinationEmoji(destination: string): string {
+  const lower = destination.toLowerCase();
+  for (const [key, emoji] of Object.entries(DESTINATION_EMOJIS)) {
+    if (lower.includes(key)) return emoji;
+  }
+  return '✈️';
+}
+
+// Color palette for card accents
+const CARD_COLORS = ['#1B6B93', '#E8735A', '#2EAF6E', '#F5A623', '#9B59B6', '#3498DB'];
+
+function getCardColor(index: number): string {
+  return CARD_COLORS[index % CARD_COLORS.length];
+}
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
-  // Force UTC interpretation to avoid timezone offset
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth();
   const day = date.getUTCDate();
-  return new Date(year, month, day).toLocaleDateString();
+  return new Date(year, month, day).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+function getDaysUntil(startDate: string): string | null {
+  const now = new Date();
+  const start = new Date(startDate);
+  const diff = Math.ceil((start.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return null;
+  if (diff === 0) return "Aujourd'hui !";
+  if (diff === 1) return 'Demain !';
+  return `Dans ${diff} jours`;
 }
 
 export default function TripsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { currentTrip, setCurrentTrip } = useCurrentTrip();
   const { user, logout } = useAuth();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'info' | 'warning' }>({ visible: false, message: '', type: 'success' });
+  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
-  // Reload trips every time screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadTrips();
@@ -39,16 +99,27 @@ export default function TripsScreen() {
       setTrips(data);
     } catch (err) {
       setError((err as Error).message);
-      Alert.alert('Erreur', 'Impossible de charger les voyages');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteTrip = async (trip: Trip) => {
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ visible: true, message, type });
+  };
+
+  const handleSelectTrip = (trip: Trip) => {
+    setCurrentTrip(trip);
+    showToast(`${trip.destination} sélectionné`, 'success');
+  };
+
+  const handleDeleteTrip = (trip: Trip) => {
+    // Close swipeable first
+    swipeableRefs.current.get(trip.id)?.close();
+
     Alert.alert(
       'Supprimer le voyage',
-      `Voulez-vous vraiment supprimer "${trip.destination}"?\n\nCette action est irréversible.`,
+      `Voulez-vous vraiment supprimer "${trip.destination}" ?\n\nCette action est irréversible.`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -61,9 +132,9 @@ export default function TripsScreen() {
                 setCurrentTrip(null);
               }
               await loadTrips();
-              Alert.alert('Succès', 'Voyage supprimé');
+              showToast('Voyage supprimé', 'info');
             } catch (err) {
-              Alert.alert('Erreur', 'Impossible de supprimer le voyage');
+              showToast('Impossible de supprimer le voyage', 'error');
             }
           },
         },
@@ -71,80 +142,10 @@ export default function TripsScreen() {
     );
   };
 
-  const renderTripItem = ({ item }: { item: Trip }) => {
-    const isSelected = currentTrip?.id === item.id;
-    
-    return (
-      <View style={[styles.tripCard, isSelected && styles.tripCardSelected]}>
-        <TouchableOpacity
-          style={styles.tripContent}
-          onPress={() => {
-            setCurrentTrip(item);
-            Alert.alert('Voyage sélectionné', `${item.destination} est maintenant le voyage actif`);
-          }}
-        >
-          {isSelected && <View style={styles.selectedBadge}><Text style={styles.selectedBadgeText}>✓ Actif</Text></View>}
-          <Text style={styles.tripDestination}>{item.destination}</Text>
-          {item.startDate && item.endDate && (
-            <Text style={styles.tripDates}>
-              {formatDate(item.startDate)} - {formatDate(item.endDate)}
-            </Text>
-          )}
-          {item.tripType && (
-            <Text style={styles.tripType}>{item.tripType}</Text>
-          )}
-          {item.travelers && item.travelers.length > 0 && (
-            <Text style={styles.tripTravelers}>
-              {item.travelers.length} voyageur{item.travelers.length > 1 ? 's' : ''}
-            </Text>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteTrip(item)}
-        >
-          <Text style={styles.deleteButtonText}>🗑️ Supprimer</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Chargement...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>❌ {error}</Text>
-        <Text style={styles.errorHint}>
-          Si le token est expiré, déconnectez-vous et reconnectez-vous.
-        </Text>
-        <View style={styles.errorButtons}>
-          <Button title="Réessayer" onPress={loadTrips} />
-          <View style={{ width: 10 }} />
-          <Button 
-            title="Déconnexion" 
-            onPress={async () => {
-              await logout();
-              router.replace('/auth/login');
-            }}
-            color="#ff3b30"
-          />
-        </View>
-      </View>
-    );
-  }
-
-  const handleLogout = async () => {
+  const handleLogout = () => {
     Alert.alert(
       'Déconnexion',
-      'Voulez-vous vous déconnecter?',
+      'Voulez-vous vous déconnecter ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -159,35 +160,180 @@ export default function TripsScreen() {
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Mes Voyages</Text>
-          {user && <Text style={styles.userEmail}>{user.name}</Text>}
-        </View>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Text style={styles.logoutText}>Déconnexion</Text>
+  const renderRightActions = (trip: Trip) => {
+    return (
+      <TouchableOpacity
+        style={styles.swipeDeleteAction}
+        onPress={() => handleDeleteTrip(trip)}
+      >
+        <Ionicons name="trash-outline" size={24} color={colors.textInverse} />
+        <Text style={styles.swipeDeleteText}>Supprimer</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderTripItem = ({ item, index }: { item: Trip; index: number }) => {
+    const isSelected = currentTrip?.id === item.id;
+    const cardColor = getCardColor(index);
+    const emoji = getDestinationEmoji(item.destination);
+    const daysUntil = item.startDate ? getDaysUntil(item.startDate) : null;
+
+    return (
+      <Swipeable
+        ref={(ref) => {
+          if (ref) swipeableRefs.current.set(item.id, ref);
+        }}
+        renderRightActions={() => renderRightActions(item)}
+        overshootRight={false}
+        friction={2}
+      >
+        <TouchableOpacity
+          style={[styles.tripCard, isSelected && styles.tripCardSelected]}
+          onPress={() => handleSelectTrip(item)}
+          activeOpacity={0.7}
+        >
+          {/* Color accent bar */}
+          <View style={[styles.cardAccent, { backgroundColor: cardColor }]} />
+
+          <View style={styles.cardContent}>
+            <View style={styles.cardTopRow}>
+              <View style={styles.cardInfo}>
+                <View style={styles.destinationRow}>
+                  <Text style={styles.destinationEmoji}>{emoji}</Text>
+                  <Text style={styles.tripDestination} numberOfLines={1}>
+                    {item.destination}
+                  </Text>
+                </View>
+
+                {item.name && item.name !== item.destination && (
+                  <Text style={styles.tripName} numberOfLines={1}>{item.name}</Text>
+                )}
+
+                {item.startDate && item.endDate && (
+                  <View style={styles.dateRow}>
+                    <Ionicons name="calendar-outline" size={14} color={colors.textTertiary} />
+                    <Text style={styles.tripDates}>
+                      {formatDate(item.startDate)} → {formatDate(item.endDate)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.cardActions}>
+                {isSelected && (
+                  <View style={[styles.activeBadge, { backgroundColor: cardColor }]}>
+                    <Ionicons name="checkmark" size={12} color={colors.textInverse} />
+                  </View>
+                )}
+                <ActionMenu
+                  items={[
+                    {
+                      label: 'Supprimer',
+                      icon: 'trash-outline',
+                      onPress: () => handleDeleteTrip(item),
+                      destructive: true,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+
+            {/* Bottom tags row */}
+            <View style={styles.tagsRow}>
+              {item.tripType && (
+                <View style={[styles.tag, { backgroundColor: colors.primarySurface }]}>
+                  <Text style={[styles.tagText, { color: colors.primary }]}>{item.tripType}</Text>
+                </View>
+              )}
+              {item.travelers && item.travelers.length > 0 && (
+                <View style={[styles.tag, { backgroundColor: colors.accentSurface }]}>
+                  <Ionicons name="people-outline" size={12} color={colors.accent} />
+                  <Text style={[styles.tagText, { color: colors.accent }]}>
+                    {item.travelers.length}
+                  </Text>
+                </View>
+              )}
+              {daysUntil && (
+                <View style={[styles.tag, { backgroundColor: colors.successLight }]}>
+                  <Text style={[styles.tagText, { color: colors.successDark }]}>{daysUntil}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Swipeable>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Chargement...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
+        <Ionicons name="cloud-offline-outline" size={48} color={colors.textTertiary} />
+        <Text style={styles.errorTitle}>Connexion impossible</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.errorButtons}>
+          <TouchableOpacity style={styles.retryButton} onPress={loadTrips}>
+            <Ionicons name="refresh" size={18} color={colors.textInverse} />
+            <Text style={styles.retryButtonText}>Réessayer</Text>
           </TouchableOpacity>
-          <Button 
-            title="+ Nouveau" 
+          <TouchableOpacity
+            style={styles.logoutErrorButton}
+            onPress={async () => {
+              await logout();
+              router.replace('/auth/login');
+            }}
+          >
+            <Text style={styles.logoutErrorButtonText}>Déconnexion</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <GestureHandlerRootView style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+        <View>
+          <Text style={styles.headerTitle}>Mes Voyages</Text>
+          {user && <Text style={styles.headerSubtitle}>Bonjour, {user.name} 👋</Text>}
+        </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.newTripButton}
             onPress={() => router.push('/new-trip')}
-          />
+          >
+            <Ionicons name="add" size={20} color={colors.textInverse} />
+            <Text style={styles.newTripButtonText}>Nouveau</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
       {trips.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>🌍</Text>
+          <Text style={styles.emptyEmoji}>🌍</Text>
           <Text style={styles.emptyTitle}>Aucun voyage</Text>
           <Text style={styles.emptySubtitle}>
-            Créez votre premier voyage pour commencer
+            Créez votre premier voyage pour commencer l'aventure !
           </Text>
-          <Button 
-            title="Créer un voyage" 
+          <TouchableOpacity
+            style={styles.emptyButton}
             onPress={() => router.push('/new-trip')}
-          />
+          >
+            <Ionicons name="add-circle-outline" size={20} color={colors.textInverse} />
+            <Text style={styles.emptyButtonText}>Créer un voyage</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -197,167 +343,264 @@ export default function TripsScreen() {
           contentContainerStyle={styles.listContainer}
           refreshing={loading}
           onRefresh={loadTrips}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         />
       )}
-    </View>
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        visible={toast.visible}
+        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: spacing.xxxxl,
+    backgroundColor: colors.background,
   },
+
+  // Header
   header: {
+    ...componentStyles.screenHeader,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    alignItems: 'flex-end',
+    paddingBottom: spacing.lg,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  headerTitle: {
+    ...typography.h1,
+    color: colors.textPrimary,
   },
-  userEmail: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
+  headerSubtitle: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
-  headerButtons: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.sm,
   },
   logoutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#f0f0f0',
-  },
-  logoutText: {
-    fontSize: 14,
-    color: '#ff3b30',
-    fontWeight: '600',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
-  },
-  errorText: {
-    color: '#ff3b30',
-    marginBottom: 10,
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  errorHint: {
-    color: '#666',
-    marginBottom: 20,
-    textAlign: 'center',
-    fontSize: 14,
-    paddingHorizontal: 20,
-  },
-  errorButtons: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.pill,
+    backgroundColor: colors.surfaceSecondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  newTripButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.pill,
+    gap: spacing.xs,
+  },
+  newTripButtonText: {
+    ...typography.labelMedium,
+    color: colors.textInverse,
+  },
+
+  // Loading / Error
+  loadingText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+  },
+  errorTitle: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  errorText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xxl,
+  },
+  errorButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+  retryButtonText: {
+    ...typography.labelMedium,
+    color: colors.textInverse,
+  },
+  logoutErrorButton: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
+  logoutErrorButtonText: {
+    ...typography.labelMedium,
+    color: colors.danger,
+  },
+
+  // Trip Card
+  listContainer: {
+    padding: spacing.lg,
+  },
+  tripCard: {
+    ...componentStyles.card,
+    overflow: 'hidden',
+    flexDirection: 'row',
+  },
+  tripCardSelected: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  cardAccent: {
+    width: 5,
+  },
+  cardContent: {
+    flex: 1,
+    padding: spacing.lg,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cardInfo: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  destinationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  destinationEmoji: {
+    fontSize: 22,
+  },
+  tripDestination: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  tripName: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    marginLeft: 30, // align with destination text
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  tripDates: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  activeBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Tags
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.pill,
+    gap: spacing.xs,
+  },
+  tagText: {
+    ...typography.caption,
+    fontWeight: '600',
+  },
+
+  // Swipe delete
+  swipeDeleteAction: {
+    backgroundColor: colors.danger,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 90,
+    borderTopRightRadius: borderRadius.lg,
+    borderBottomRightRadius: borderRadius.lg,
+  },
+  swipeDeleteText: {
+    ...typography.caption,
+    color: colors.textInverse,
+    marginTop: spacing.xs,
+  },
+
+  // Empty state
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: spacing.xxxxl,
   },
-  emptyText: {
-    fontSize: 60,
-    marginBottom: 20,
+  emptyEmoji: {
+    fontSize: 64,
+    marginBottom: spacing.xxl,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#666',
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: spacing.xxxl,
   },
-  listContainer: {
-    padding: 16,
-  },
-  tripCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: 'hidden',
-  },
-  tripCardSelected: {
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    backgroundColor: '#f0f7ff',
-  },
-  tripContent: {
-    padding: 16,
-    position: 'relative',
-  },
-  deleteButton: {
-    backgroundColor: '#ff3b30',
-    padding: 12,
+  emptyButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
   },
-  deleteButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  selectedBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  selectedBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  tripDestination: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  tripDates: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  tripType: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 4,
-  },
-  tripTravelers: {
-    fontSize: 12,
-    color: '#999',
+  emptyButtonText: {
+    ...typography.labelLarge,
+    color: colors.textInverse,
   },
 });

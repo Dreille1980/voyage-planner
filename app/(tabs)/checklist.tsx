@@ -1,26 +1,36 @@
- import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useCurrentTrip } from '../../contexts/TripContext';
 import { getAllChecklistsForTrip, regenerateChecklist, updateChecklistItem } from '../../services/api';
 import type { Checklist, ChecklistType, ChecklistItem } from '../../types/api';
+import ProgressBar from '../../components/ProgressBar';
+import { colors, typography, spacing, borderRadius, shadows, componentStyles } from '../../theme';
 
-const CHECKLIST_CONFIG = {
+const CHECKLIST_CONFIG: Record<ChecklistType, { title: string; icon: string; color: string }> = {
   preparatifs: {
-    title: '📋 Préparatifs du voyage',
+    title: 'Préparatifs du voyage',
     icon: '📋',
+    color: colors.primary,
   },
   bagage_soute: {
-    title: '🧳 Bagage en soute',
+    title: 'Bagage en soute',
     icon: '🧳',
+    color: colors.accent,
   },
   bagage_main: {
-    title: '🎒 Bagage à main',
+    title: 'Bagage à main',
     icon: '🎒',
+    color: colors.success,
   },
 };
 
 export default function ChecklistScreen() {
   const { currentTrip } = useCurrentTrip();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedLists, setExpandedLists] = useState<Set<string>>(new Set(['preparatifs']));
@@ -41,7 +51,6 @@ export default function ChecklistScreen() {
       const data = await getAllChecklistsForTrip(currentTrip.id);
       setChecklists(data);
     } catch (err) {
-      // Ne pas afficher d'erreur si les checklists n'existent pas encore (404)
       const errorMessage = (err as Error).message;
       if (!errorMessage.includes('404')) {
         Alert.alert('Erreur', 'Impossible de charger les checklists');
@@ -67,7 +76,7 @@ export default function ChecklistScreen() {
       await updateChecklistItem(itemId, { checked });
       loadChecklists();
     } catch (err) {
-      Alert.alert('Erreur', 'Impossible de mettre à jour l\'item');
+      Alert.alert('Erreur', "Impossible de mettre à jour l'item");
     }
   };
 
@@ -76,7 +85,7 @@ export default function ChecklistScreen() {
 
     Alert.alert(
       'Régénérer la checklist',
-      `Voulez-vous régénérer la checklist "${CHECKLIST_CONFIG[type].title}" ? Les modifications seront perdues.`,
+      `Voulez-vous régénérer "${CHECKLIST_CONFIG[type].title}" ? Les modifications seront perdues.`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -87,7 +96,6 @@ export default function ChecklistScreen() {
               setLoading(true);
               await regenerateChecklist(currentTrip.id, type);
               loadChecklists();
-              Alert.alert('Succès', 'Checklist régénérée');
             } catch (err) {
               Alert.alert('Erreur', 'Impossible de régénérer la checklist');
             } finally {
@@ -115,16 +123,16 @@ export default function ChecklistScreen() {
   };
 
   const getDeadlineColor = (deadline: string | null): string => {
-    if (!deadline) return '#666';
-    
+    if (!deadline) return colors.textTertiary;
+
     const deadlineDate = new Date(deadline);
     const today = new Date();
     const daysUntil = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (daysUntil < 0) return '#ff3b30'; // Dépassé
-    if (daysUntil < 7) return '#ff9500'; // Urgent
-    if (daysUntil < 30) return '#ffcc00'; // Bientôt
-    return '#34c759'; // OK
+
+    if (daysUntil < 0) return colors.danger;
+    if (daysUntil < 7) return colors.warning;
+    if (daysUntil < 30) return colors.warningDark;
+    return colors.success;
   };
 
   const renderItem = (item: ChecklistItem, checklistType: ChecklistType) => {
@@ -136,9 +144,10 @@ export default function ChecklistScreen() {
         <TouchableOpacity
           style={styles.itemRow}
           onPress={() => handleCheckItem(item.id, !item.checked)}
+          activeOpacity={0.6}
         >
           <View style={[styles.checkbox, item.checked && styles.checkboxChecked]}>
-            {item.checked && <Text style={styles.checkmark}>✓</Text>}
+            {item.checked && <Ionicons name="checkmark" size={14} color={colors.textInverse} />}
           </View>
           <Text style={[styles.itemLabel, item.checked && styles.itemLabelChecked]}>
             {item.label}
@@ -154,22 +163,23 @@ export default function ChecklistScreen() {
                   value={tempDeadline}
                   onChangeText={setTempDeadline}
                   placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textTertiary}
                 />
                 <TouchableOpacity onPress={() => handleSaveDeadline(item.id)} style={styles.saveButton}>
-                  <Text style={styles.saveButtonText}>✓</Text>
+                  <Ionicons name="checkmark" size={14} color={colors.textInverse} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setEditingDeadline(null)} style={styles.cancelButton}>
-                  <Text style={styles.cancelButtonText}>✕</Text>
+                  <Ionicons name="close" size={14} color={colors.textInverse} />
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.deadline}
                 onPress={() => handleEditDeadline(item.id, item.deadline)}
               >
+                <Ionicons name="calendar-outline" size={13} color={getDeadlineColor(item.deadline)} />
                 <Text style={[styles.deadlineText, { color: getDeadlineColor(item.deadline) }]}>
-                  📅 {item.deadline ? new Date(item.deadline).toLocaleDateString() : 'Pas de deadline'}
+                  {item.deadline ? new Date(item.deadline).toLocaleDateString('fr-FR') : 'Pas de deadline'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -193,24 +203,39 @@ export default function ChecklistScreen() {
         <TouchableOpacity
           style={styles.checklistHeader}
           onPress={() => toggleExpanded(checklist.checklistType)}
+          activeOpacity={0.7}
         >
           <View style={styles.checklistHeaderLeft}>
             <Text style={styles.checklistIcon}>{config.icon}</Text>
-            <View>
+            <View style={styles.checklistHeaderInfo}>
               <Text style={styles.checklistTitle}>{config.title}</Text>
-              <Text style={styles.checklistProgress}>
-                {checkedItems}/{totalItems} complétés
-              </Text>
+              <View style={styles.progressContainer}>
+                <ProgressBar
+                  current={checkedItems}
+                  total={totalItems}
+                  height={4}
+                  color={config.color}
+                  showLabel={false}
+                />
+                <Text style={styles.checklistProgress}>
+                  {checkedItems}/{totalItems}
+                </Text>
+              </View>
             </View>
           </View>
           <View style={styles.checklistHeaderRight}>
             <TouchableOpacity
               onPress={() => handleRegenerateChecklist(checklist.checklistType)}
               style={styles.regenerateButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.regenerateButtonText}>🔄</Text>
+              <Ionicons name="refresh" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
-            <Text style={styles.expandIcon}>{isExpanded ? '▼' : '▶'}</Text>
+            <Ionicons
+              name={isExpanded ? 'chevron-down' : 'chevron-forward'}
+              size={18}
+              color={colors.textTertiary}
+            />
           </View>
         </TouchableOpacity>
 
@@ -230,20 +255,26 @@ export default function ChecklistScreen() {
 
   if (!currentTrip) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>🌍</Text>
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
+        <Ionicons name="briefcase-outline" size={56} color={colors.textTertiary} />
         <Text style={styles.emptyTitle}>Aucun voyage sélectionné</Text>
         <Text style={styles.emptySubtitle}>
-          Sélectionnez un voyage dans l'onglet "Mes Voyages" pour voir ses checklists
+          Sélectionnez un voyage dans l'onglet Voyages pour voir ses checklists
         </Text>
+        <TouchableOpacity
+          style={styles.goToTripsButton}
+          onPress={() => router.navigate('/(tabs)/trips')}
+        >
+          <Text style={styles.goToTripsText}>Aller aux voyages</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement...</Text>
       </View>
     );
@@ -251,25 +282,30 @@ export default function ChecklistScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Checklists</Text>
-          <View style={styles.tripBadge}>
-            <Text style={styles.tripBadgeText}>
-              🌍 {currentTrip.destination}
-            </Text>
-          </View>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+        <Text style={styles.headerTitle}>Checklists</Text>
+        <View style={styles.tripBadge}>
+          <Ionicons name="location" size={14} color={colors.primary} />
+          <Text style={styles.tripBadgeText}>{currentTrip.destination}</Text>
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {checklists.length === 0 ? (
           <View style={styles.emptyListContainer}>
-            <Text style={styles.emptyText}>⏳</Text>
-            <Text style={styles.emptyTitle}>Checklists en cours de génération...</Text>
-            <Text style={styles.emptySubtitle}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.emptyListTitle}>Génération en cours...</Text>
+            <Text style={styles.emptyListSubtitle}>
               Les checklists sont en train d'être générées par l'IA. Rafraîchissez dans quelques secondes.
             </Text>
+            <TouchableOpacity style={styles.refreshButton} onPress={loadChecklists}>
+              <Ionicons name="refresh" size={18} color={colors.textInverse} />
+              <Text style={styles.refreshButtonText}>Rafraîchir</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           checklists.map(renderChecklist)
@@ -282,85 +318,121 @@ export default function ChecklistScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: spacing.xxxxl,
+    backgroundColor: colors.background,
   },
+
+  // Header
   header: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    ...componentStyles.screenHeader,
+    paddingBottom: spacing.lg,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    ...typography.h1,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   tripBadge: {
-    backgroundColor: '#f0f7ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primarySurface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.pill,
     alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    gap: spacing.xs,
   },
   tripBadgeText: {
-    color: '#007AFF',
-    fontSize: 14,
-    fontWeight: '600',
+    ...typography.labelSmall,
+    color: colors.primary,
   },
+
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxxxl,
+  },
+
+  // Loading
   loadingText: {
-    marginTop: 10,
-    color: '#666',
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
   },
-  emptyIcon: {
-    fontSize: 60,
-    marginBottom: 20,
-  },
+
+  // Empty states
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#666',
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
     textAlign: 'center',
+    marginBottom: spacing.xxl,
+  },
+  goToTripsButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  goToTripsText: {
+    ...typography.labelMedium,
+    color: colors.textInverse,
   },
   emptyListContainer: {
-    padding: 40,
     alignItems: 'center',
+    paddingVertical: spacing.xxxxl,
   },
-  emptyText: {
-    fontSize: 60,
-    marginBottom: 20,
+  emptyListTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
+  emptyListSubtitle: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xxl,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+  refreshButtonText: {
+    ...typography.labelMedium,
+    color: colors.textInverse,
+  },
+
+  // Checklist card
   checklistCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...componentStyles.card,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
   },
   checklistHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: spacing.lg,
   },
   checklistHeaderLeft: {
     flexDirection: 'row',
@@ -368,130 +440,128 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   checklistIcon: {
-    fontSize: 32,
-    marginRight: 12,
+    fontSize: 28,
+    marginRight: spacing.md,
+  },
+  checklistHeaderInfo: {
+    flex: 1,
   },
   checklistTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   checklistProgress: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    ...typography.caption,
+    color: colors.textTertiary,
+    minWidth: 35,
   },
   checklistHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
   },
   regenerateButton: {
-    padding: 8,
-    marginRight: 8,
+    padding: spacing.xs,
   },
-  regenerateButtonText: {
-    fontSize: 20,
-  },
-  expandIcon: {
-    fontSize: 16,
-    color: '#666',
-  },
+
+  // Checklist content
   checklistContent: {
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingBottom: 8,
+    borderTopColor: colors.borderLight,
+    paddingBottom: spacing.sm,
   },
   category: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   categoryName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#333',
+    ...typography.labelMedium,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
+
+  // Item
   itemContainer: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderWidth: 2,
-    borderColor: '#007AFF',
-    borderRadius: 6,
-    marginRight: 12,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.sm,
+    marginRight: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#007AFF',
-  },
-  checkmark: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   itemLabel: {
-    fontSize: 15,
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
     flex: 1,
   },
   itemLabelChecked: {
     textDecorationLine: 'line-through',
-    color: '#999',
+    color: colors.textTertiary,
   },
+
+  // Deadline
   deadlineContainer: {
-    marginLeft: 36,
-    marginTop: 4,
+    marginLeft: 38,
+    marginTop: spacing.xs,
   },
   deadline: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
+    gap: spacing.xs,
   },
   deadlineText: {
-    fontSize: 13,
+    ...typography.caption,
     fontWeight: '500',
   },
   deadlineEdit: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
   },
   deadlineInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    padding: 6,
-    fontSize: 13,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    ...typography.caption,
     width: 120,
-    marginRight: 8,
+    color: colors.textPrimary,
   },
   saveButton: {
-    backgroundColor: '#34c759',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    backgroundColor: colors.success,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 4,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   cancelButton: {
-    backgroundColor: '#ff3b30',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    backgroundColor: colors.danger,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });

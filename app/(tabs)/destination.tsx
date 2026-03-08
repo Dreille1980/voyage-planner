@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useCurrentTrip } from '../../contexts/TripContext';
 import { getDestinationInfo, regenerateDestinationInfo } from '../../services/api';
 import type { DestinationInfo } from '../../types/api';
+import { colors, typography, spacing, borderRadius, shadows, componentStyles } from '../../theme';
 
 const SECTION_ICONS: { [key: string]: string } = {
   'Choses importantes à savoir': '🔔',
@@ -18,6 +22,8 @@ const SECTION_ICONS: { [key: string]: string } = {
 
 export default function DestinationScreen() {
   const { currentTrip } = useCurrentTrip();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [destinationInfo, setDestinationInfo] = useState<DestinationInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
@@ -36,7 +42,6 @@ export default function DestinationScreen() {
       const data = await getDestinationInfo(currentTrip.id);
       setDestinationInfo(data);
     } catch (err) {
-      // Ne pas afficher d'erreur si les infos n'existent pas encore (404)
       const errorMessage = (err as Error).message;
       if (!errorMessage.includes('404')) {
         Alert.alert('Erreur', 'Impossible de charger les informations de destination');
@@ -52,7 +57,7 @@ export default function DestinationScreen() {
 
     Alert.alert(
       'Régénérer les informations',
-      'Voulez-vous régénérer les informations de destination ? Cela peut prendre quelques secondes.',
+      'Voulez-vous régénérer les informations de destination ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -62,7 +67,6 @@ export default function DestinationScreen() {
               setRegenerating(true);
               const data = await regenerateDestinationInfo(currentTrip.id);
               setDestinationInfo(data);
-              Alert.alert('Succès', 'Informations régénérées');
             } catch (err) {
               Alert.alert('Erreur', 'Impossible de régénérer les informations');
             } finally {
@@ -76,20 +80,26 @@ export default function DestinationScreen() {
 
   if (!currentTrip) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>🌍</Text>
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
+        <Ionicons name="briefcase-outline" size={56} color={colors.textTertiary} />
         <Text style={styles.emptyTitle}>Aucun voyage sélectionné</Text>
         <Text style={styles.emptySubtitle}>
-          Sélectionnez un voyage dans l'onglet "Mes Voyages" pour voir les informations sur la destination
+          Sélectionnez un voyage dans l'onglet Voyages pour voir les infos destination
         </Text>
+        <TouchableOpacity
+          style={styles.goToTripsButton}
+          onPress={() => router.navigate('/(tabs)/trips')}
+        >
+          <Text style={styles.goToTripsText}>Aller aux voyages</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Chargement...</Text>
       </View>
     );
@@ -97,14 +107,15 @@ export default function DestinationScreen() {
 
   if (!destinationInfo) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>⏳</Text>
-        <Text style={styles.emptyTitle}>Informations en cours de génération...</Text>
+      <View style={[styles.centerContainer, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.emptyTitle}>Génération en cours...</Text>
         <Text style={styles.emptySubtitle}>
-          Les informations sur la destination sont en train d'être générées par l'IA. Rafraîchissez dans quelques secondes.
+          Les informations sont en train d'être générées par l'IA. Rafraîchissez dans quelques secondes.
         </Text>
         <TouchableOpacity style={styles.refreshButton} onPress={loadDestinationInfo}>
-          <Text style={styles.refreshButtonText}>🔄 Rafraîchir</Text>
+          <Ionicons name="refresh" size={18} color={colors.textInverse} />
+          <Text style={styles.refreshButtonText}>Rafraîchir</Text>
         </TouchableOpacity>
       </View>
     );
@@ -112,13 +123,12 @@ export default function DestinationScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Informations Destination</Text>
+          <Text style={styles.headerTitle}>Destination</Text>
           <View style={styles.tripBadge}>
-            <Text style={styles.tripBadgeText}>
-              🌍 {currentTrip.destination}
-            </Text>
+            <Ionicons name="location" size={14} color={colors.primary} />
+            <Text style={styles.tripBadgeText}>{currentTrip.destination}</Text>
           </View>
         </View>
         <TouchableOpacity
@@ -127,17 +137,21 @@ export default function DestinationScreen() {
           disabled={regenerating}
         >
           {regenerating ? (
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <Text style={styles.regenerateButtonText}>🔄</Text>
+            <Ionicons name="refresh" size={20} color={colors.textSecondary} />
           )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {destinationInfo.sections.map((section, index) => {
           const icon = SECTION_ICONS[section.title] || '📍';
-          
+
           return (
             <View key={index} style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
@@ -147,7 +161,7 @@ export default function DestinationScreen() {
               <View style={styles.sectionContent}>
                 {section.bullets.map((bullet, bulletIndex) => (
                   <View key={bulletIndex} style={styles.bulletItem}>
-                    <Text style={styles.bulletPoint}>•</Text>
+                    <View style={styles.bulletDot} />
                     <Text style={styles.bulletText}>{bullet}</Text>
                   </View>
                 ))}
@@ -157,8 +171,15 @@ export default function DestinationScreen() {
         })}
 
         <View style={styles.footer}>
+          <Ionicons name="time-outline" size={14} color={colors.textTertiary} />
           <Text style={styles.footerText}>
-            Dernière mise à jour: {new Date(destinationInfo.updatedAt).toLocaleString()}
+            Mis à jour le {new Date(destinationInfo.updatedAt).toLocaleDateString('fr-FR', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
           </Text>
         </View>
       </ScrollView>
@@ -169,145 +190,162 @@ export default function DestinationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: spacing.xxxxl,
+    backgroundColor: colors.background,
   },
+
+  // Header
   header: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    ...componentStyles.screenHeader,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    paddingBottom: spacing.lg,
   },
   headerLeft: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    ...typography.h1,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   tripBadge: {
-    backgroundColor: '#f0f7ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primarySurface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.pill,
     alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    gap: spacing.xs,
   },
   tripBadgeText: {
-    color: '#007AFF',
-    fontSize: 14,
-    fontWeight: '600',
+    ...typography.labelSmall,
+    color: colors.primary,
   },
   regenerateButton: {
-    padding: 12,
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.pill,
+    backgroundColor: colors.surfaceSecondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  regenerateButtonText: {
-    fontSize: 24,
-  },
+
   scrollView: {
     flex: 1,
   },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
+  scrollContent: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxxxl,
   },
-  emptyIcon: {
-    fontSize: 60,
-    marginBottom: 20,
+
+  // Loading & Empty
+  loadingText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#666',
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
+  },
+  goToTripsButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  goToTripsText: {
+    ...typography.labelMedium,
+    color: colors.textInverse,
   },
   refreshButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
   },
   refreshButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.labelMedium,
+    color: colors.textInverse,
   },
+
+  // Section card
   sectionCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...componentStyles.card,
+    marginBottom: spacing.md,
     overflow: 'hidden',
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f8f9fa',
+    padding: spacing.lg,
+    backgroundColor: colors.surfaceSecondary,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: colors.borderLight,
   },
   sectionIcon: {
-    fontSize: 24,
-    marginRight: 12,
+    fontSize: 22,
+    marginRight: spacing.md,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    ...typography.h3,
+    color: colors.textPrimary,
     flex: 1,
   },
   sectionContent: {
-    padding: 16,
+    padding: spacing.lg,
   },
   bulletItem: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: spacing.md,
+    alignItems: 'flex-start',
   },
-  bulletPoint: {
-    fontSize: 16,
-    marginRight: 12,
-    color: '#007AFF',
-    fontWeight: 'bold',
+  bulletDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+    marginTop: 8,
+    marginRight: spacing.md,
   },
   bulletText: {
-    fontSize: 15,
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
     flex: 1,
-    lineHeight: 22,
-    color: '#333',
   },
+
+  // Footer
   footer: {
-    padding: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.xs,
   },
   footerText: {
-    fontSize: 12,
-    color: '#999',
+    ...typography.caption,
+    color: colors.textTertiary,
     fontStyle: 'italic',
   },
 });

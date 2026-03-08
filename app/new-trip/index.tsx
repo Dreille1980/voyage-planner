@@ -11,11 +11,13 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { createTrip } from '../../services/api';
 import type { CreateTripInput, GroupType, TripGoal, Pace } from '../../types/api';
+import { colors, typography, spacing, borderRadius, componentStyles, shadows } from '../../theme';
 
 type DateMode = 'exact' | 'duration';
 
@@ -24,6 +26,7 @@ export default function NewTripScreen() {
   const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Form data
   const [name, setName] = useState('');
@@ -41,6 +44,14 @@ export default function NewTripScreen() {
 
   const totalSteps = 5;
 
+  const clearError = (field: string) => {
+    if (errors[field]) setErrors(prev => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
   const handleClose = () => {
     Alert.alert(
       'Quitter la création',
@@ -53,35 +64,28 @@ export default function NewTripScreen() {
   };
 
   const handleNext = () => {
-    // Validation par étape
+    const newErrors: Record<string, string> = {};
+
     if (currentStep === 1) {
-      if (!name.trim() || !destination.trim()) {
-        Alert.alert('Erreur', 'Veuillez remplir le nom du voyage et la destination');
-        return;
-      }
+      if (!name.trim()) newErrors.name = 'Nom du voyage requis';
+      if (!destination.trim()) newErrors.destination = 'Destination requise';
     } else if (currentStep === 2) {
       if (dateMode === 'exact' && (!startDate || !endDate)) {
-        Alert.alert('Erreur', 'Veuillez saisir les dates de début et de fin');
-        return;
+        if (!startDate) newErrors.startDate = 'Date de début requise';
+        if (!endDate) newErrors.endDate = 'Date de fin requise';
       } else if (dateMode === 'duration' && !numberOfDays) {
-        Alert.alert('Erreur', 'Veuillez saisir le nombre de jours');
-        return;
+        newErrors.numberOfDays = 'Nombre de jours requis';
       }
     } else if (currentStep === 3) {
-      if (!numberOfPeople || groupTypes.length === 0) {
-        Alert.alert('Erreur', 'Veuillez remplir le nombre de personnes et sélectionner au moins un type de groupe');
-        return;
-      }
+      if (!numberOfPeople) newErrors.numberOfPeople = 'Nombre de personnes requis';
+      if (groupTypes.length === 0) newErrors.groupTypes = 'Sélectionnez au moins un type';
     } else if (currentStep === 4) {
-      if (tripGoals.length === 0) {
-        Alert.alert('Erreur', 'Veuillez sélectionner au moins un objectif de voyage');
-        return;
-      }
-      if (tripGoals.includes('autre') && !tripGoalOther.trim()) {
-        Alert.alert('Erreur', 'Veuillez préciser l\'objectif du voyage');
-        return;
-      }
+      if (tripGoals.length === 0) newErrors.tripGoals = 'Sélectionnez au moins un objectif';
+      if (tripGoals.includes('autre') && !tripGoalOther.trim()) newErrors.tripGoalOther = 'Précisez l\'objectif';
     }
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
@@ -90,24 +94,27 @@ export default function NewTripScreen() {
 
   const handlePrevious = () => {
     if (currentStep > 1) {
+      setErrors({});
       setCurrentStep(currentStep - 1);
     }
   };
 
   const toggleGroupType = (type: GroupType) => {
-    setGroupTypes(prev => 
-      prev.includes(type) 
+    setGroupTypes(prev =>
+      prev.includes(type)
         ? prev.filter(t => t !== type)
         : [...prev, type]
     );
+    clearError('groupTypes');
   };
 
   const toggleTripGoal = (goal: TripGoal) => {
-    setTripGoals(prev => 
-      prev.includes(goal) 
+    setTripGoals(prev =>
+      prev.includes(goal)
         ? prev.filter(g => g !== goal)
         : [...prev, goal]
     );
+    clearError('tripGoals');
   };
 
   const handleSubmit = async () => {
@@ -118,9 +125,9 @@ export default function NewTripScreen() {
         name: name.trim(),
         destination: destination.trim(),
         ...(dateMode === 'exact' && startDate && endDate
-          ? { 
-              startDate: startDate.toISOString().split('T')[0], 
-              endDate: endDate.toISOString().split('T')[0] 
+          ? {
+              startDate: startDate.toISOString().split('T')[0],
+              endDate: endDate.toISOString().split('T')[0],
             }
           : {}),
         ...(dateMode === 'duration' && numberOfDays
@@ -128,19 +135,18 @@ export default function NewTripScreen() {
           : {}),
         numberOfPeople: numberOfPeople ? parseInt(numberOfPeople) : undefined,
         groupType: groupTypes.length > 0 ? groupTypes : undefined,
-        tripGoal: tripGoals.length > 0 
+        tripGoal: tripGoals.length > 0
           ? tripGoals.map(g => g === 'autre' ? tripGoalOther : g) as TripGoal[]
           : undefined,
       };
 
-      const newTrip = await createTrip(tripData);
+      await createTrip(tripData);
       Alert.alert('Succès', 'Voyage créé avec succès !', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
-      console.error('Error creating trip:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create trip';
-      Alert.alert('Erreur', `Erreur lors de la création du voyage:\n\n${errorMessage}\n\nVérifiez que le backend est accessible.`);
+      Alert.alert('Erreur', `Erreur lors de la création du voyage:\n\n${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -148,25 +154,38 @@ export default function NewTripScreen() {
 
   const formatDate = (date: Date | null) => {
     if (!date) return '';
-    return date.toLocaleDateString('fr-FR', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     });
   };
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
-      <Text style={styles.stepText}>
-        Étape {currentStep} / {totalSteps}
-      </Text>
-      <View style={styles.progressBar}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${(currentStep / totalSteps) * 100}%` },
-          ]}
-        />
+      <View style={styles.stepRow}>
+        {Array.from({ length: totalSteps }, (_, i) => (
+          <View key={i} style={styles.stepDotContainer}>
+            <View
+              style={[
+                styles.stepDot,
+                i + 1 <= currentStep && styles.stepDotActive,
+                i + 1 < currentStep && styles.stepDotCompleted,
+              ]}
+            >
+              {i + 1 < currentStep ? (
+                <Ionicons name="checkmark" size={12} color={colors.textInverse} />
+              ) : (
+                <Text style={[styles.stepDotText, i + 1 <= currentStep && styles.stepDotTextActive]}>
+                  {i + 1}
+                </Text>
+              )}
+            </View>
+            {i < totalSteps - 1 && (
+              <View style={[styles.stepLine, i + 1 < currentStep && styles.stepLineActive]} />
+            )}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -174,20 +193,23 @@ export default function NewTripScreen() {
   const renderStep1 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>📝 Informations générales</Text>
+
       <Text style={styles.label}>Nom du voyage *</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, errors.name && styles.inputError]}
         value={name}
-        onChangeText={setName}
+        onChangeText={(text) => { setName(text); clearError('name'); }}
         placeholder="Ex: Italie – été 2026"
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textTertiary}
       />
+      {errors.name && <Text style={styles.fieldError}>{errors.name}</Text>}
 
       <Text style={styles.label}>Destination *</Text>
       <GooglePlacesAutocomplete
         placeholder="Rechercher une ville..."
-        onPress={(data, details = null) => {
+        onPress={(data) => {
           setDestination(data.description);
+          clearError('destination');
         }}
         query={{
           key: 'YOUR_GOOGLE_PLACES_API_KEY',
@@ -197,19 +219,20 @@ export default function NewTripScreen() {
         fetchDetails={false}
         styles={{
           textInputContainer: styles.autocompleteContainer,
-          textInput: styles.autocompleteInput,
+          textInput: [styles.input, errors.destination && styles.inputError],
           listView: styles.autocompleteList,
           row: styles.autocompleteRow,
           description: styles.autocompleteDescription,
         }}
         textInputProps={{
           value: destination,
-          onChangeText: setDestination,
-          placeholderTextColor: '#999',
+          onChangeText: (text: string) => { setDestination(text); clearError('destination'); },
+          placeholderTextColor: colors.textTertiary,
         }}
         enablePoweredByContainer={false}
         debounce={300}
       />
+      {errors.destination && <Text style={styles.fieldError}>{errors.destination}</Text>}
     </View>
   );
 
@@ -219,23 +242,27 @@ export default function NewTripScreen() {
 
       <View style={styles.radioGroup}>
         <TouchableOpacity
-          style={styles.radioButton}
+          style={[styles.radioButton, dateMode === 'exact' && styles.radioButtonActive]}
           onPress={() => setDateMode('exact')}
         >
-          <View style={styles.radio}>
+          <View style={[styles.radio, dateMode === 'exact' && styles.radioActive]}>
             {dateMode === 'exact' && <View style={styles.radioSelected} />}
           </View>
-          <Text style={styles.radioLabel}>Dates exactes</Text>
+          <Text style={[styles.radioLabel, dateMode === 'exact' && styles.radioLabelActive]}>
+            Dates exactes
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.radioButton}
+          style={[styles.radioButton, dateMode === 'duration' && styles.radioButtonActive]}
           onPress={() => setDateMode('duration')}
         >
-          <View style={styles.radio}>
+          <View style={[styles.radio, dateMode === 'duration' && styles.radioActive]}>
             {dateMode === 'duration' && <View style={styles.radioSelected} />}
           </View>
-          <Text style={styles.radioLabel}>Nombre de jours</Text>
+          <Text style={[styles.radioLabel, dateMode === 'duration' && styles.radioLabelActive]}>
+            Nombre de jours
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -243,13 +270,15 @@ export default function NewTripScreen() {
         <>
           <Text style={styles.label}>Date de début *</Text>
           <TouchableOpacity
-            style={styles.dateButton}
+            style={[styles.dateButton, errors.startDate && styles.inputError]}
             onPress={() => setShowStartPicker(true)}
           >
+            <Ionicons name="calendar-outline" size={18} color={colors.textTertiary} />
             <Text style={startDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
               {startDate ? formatDate(startDate) : 'Sélectionner une date'}
             </Text>
           </TouchableOpacity>
+          {errors.startDate && <Text style={styles.fieldError}>{errors.startDate}</Text>}
           {showStartPicker && (
             <DateTimePicker
               value={startDate || new Date()}
@@ -259,6 +288,7 @@ export default function NewTripScreen() {
                 setShowStartPicker(Platform.OS === 'ios');
                 if (selectedDate) {
                   setStartDate(selectedDate);
+                  clearError('startDate');
                 }
               }}
             />
@@ -266,13 +296,15 @@ export default function NewTripScreen() {
 
           <Text style={styles.label}>Date de fin *</Text>
           <TouchableOpacity
-            style={styles.dateButton}
+            style={[styles.dateButton, errors.endDate && styles.inputError]}
             onPress={() => setShowEndPicker(true)}
           >
+            <Ionicons name="calendar-outline" size={18} color={colors.textTertiary} />
             <Text style={endDate ? styles.dateButtonText : styles.dateButtonPlaceholder}>
               {endDate ? formatDate(endDate) : 'Sélectionner une date'}
             </Text>
           </TouchableOpacity>
+          {errors.endDate && <Text style={styles.fieldError}>{errors.endDate}</Text>}
           {showEndPicker && (
             <DateTimePicker
               value={endDate || startDate || new Date()}
@@ -283,6 +315,7 @@ export default function NewTripScreen() {
                 setShowEndPicker(Platform.OS === 'ios');
                 if (selectedDate) {
                   setEndDate(selectedDate);
+                  clearError('endDate');
                 }
               }}
             />
@@ -292,13 +325,14 @@ export default function NewTripScreen() {
         <>
           <Text style={styles.label}>Nombre de jours *</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, errors.numberOfDays && styles.inputError]}
             value={numberOfDays}
-            onChangeText={setNumberOfDays}
+            onChangeText={(text) => { setNumberOfDays(text); clearError('numberOfDays'); }}
             placeholder="Ex: 7"
             keyboardType="numeric"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textTertiary}
           />
+          {errors.numberOfDays && <Text style={styles.fieldError}>{errors.numberOfDays}</Text>}
         </>
       )}
     </View>
@@ -310,17 +344,18 @@ export default function NewTripScreen() {
 
       <Text style={styles.label}>Nombre de personnes *</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, errors.numberOfPeople && styles.inputError]}
         value={numberOfPeople}
-        onChangeText={setNumberOfPeople}
+        onChangeText={(text) => { setNumberOfPeople(text); clearError('numberOfPeople'); }}
         placeholder="Ex: 2"
         keyboardType="numeric"
-        placeholderTextColor="#999"
+        placeholderTextColor={colors.textTertiary}
       />
+      {errors.numberOfPeople && <Text style={styles.fieldError}>{errors.numberOfPeople}</Text>}
 
-      <Text style={styles.label}>Type de groupe * (sélection multiple)</Text>
-      <Text style={styles.subtitle}>Vous pouvez sélectionner plusieurs options</Text>
-      <View style={styles.buttonGroup}>
+      <Text style={styles.label}>Type de groupe *</Text>
+      <Text style={styles.hint}>Sélection multiple possible</Text>
+      <View style={styles.optionGroup}>
         {[
           { value: 'solo', label: '🧍 Solo' },
           { value: 'couple', label: '💑 Couple' },
@@ -335,6 +370,7 @@ export default function NewTripScreen() {
               groupTypes.includes(option.value as GroupType) && styles.optionButtonSelected,
             ]}
             onPress={() => toggleGroupType(option.value as GroupType)}
+            activeOpacity={0.7}
           >
             <Text
               style={[
@@ -347,15 +383,16 @@ export default function NewTripScreen() {
           </TouchableOpacity>
         ))}
       </View>
+      {errors.groupTypes && <Text style={styles.fieldError}>{errors.groupTypes}</Text>}
     </View>
   );
 
   const renderStep4 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>🎯 Objectifs du voyage</Text>
-      <Text style={styles.subtitle}>Sélectionnez un ou plusieurs objectifs</Text>
+      <Text style={styles.hint}>Sélectionnez un ou plusieurs objectifs</Text>
 
-      <View style={styles.buttonGroup}>
+      <View style={styles.optionGroup}>
         {[
           { value: 'detente', label: '🏖️ Détente / repos' },
           { value: 'tourisme', label: '🗺️ Tourisme / découverte' },
@@ -372,6 +409,7 @@ export default function NewTripScreen() {
               tripGoals.includes(option.value as TripGoal) && styles.optionButtonSelected,
             ]}
             onPress={() => toggleTripGoal(option.value as TripGoal)}
+            activeOpacity={0.7}
           >
             <Text
               style={[
@@ -384,17 +422,19 @@ export default function NewTripScreen() {
           </TouchableOpacity>
         ))}
       </View>
+      {errors.tripGoals && <Text style={styles.fieldError}>{errors.tripGoals}</Text>}
 
       {tripGoals.includes('autre') && (
         <>
           <Text style={styles.label}>Précisez *</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, errors.tripGoalOther && styles.inputError]}
             value={tripGoalOther}
-            onChangeText={setTripGoalOther}
+            onChangeText={(text) => { setTripGoalOther(text); clearError('tripGoalOther'); }}
             placeholder="Décrivez l'objectif de votre voyage"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textTertiary}
           />
+          {errors.tripGoalOther && <Text style={styles.fieldError}>{errors.tripGoalOther}</Text>}
         </>
       )}
     </View>
@@ -405,17 +445,18 @@ export default function NewTripScreen() {
       <Text style={styles.stepTitle}>✅ Récapitulatif</Text>
 
       <View style={styles.summary}>
-        <SummaryItem label="Nom" value={name} />
-        <SummaryItem label="Destination" value={destination} />
+        <SummaryItem icon="text-outline" label="Nom" value={name} />
+        <SummaryItem icon="location-outline" label="Destination" value={destination} />
         {dateMode === 'exact' && startDate && endDate && (
-          <SummaryItem label="Dates" value={`${formatDate(startDate)} → ${formatDate(endDate)}`} />
+          <SummaryItem icon="calendar-outline" label="Dates" value={`${formatDate(startDate)} → ${formatDate(endDate)}`} />
         )}
         {dateMode === 'duration' && numberOfDays && (
-          <SummaryItem label="Durée" value={`${numberOfDays} jours`} />
+          <SummaryItem icon="time-outline" label="Durée" value={`${numberOfDays} jours`} />
         )}
-        <SummaryItem label="Participants" value={`${numberOfPeople} personne(s)`} />
-        <SummaryItem label="Types de groupe" value={groupTypes.join(', ')} />
+        <SummaryItem icon="people-outline" label="Participants" value={`${numberOfPeople} personne(s)`} />
+        <SummaryItem icon="grid-outline" label="Groupe" value={groupTypes.join(', ')} />
         <SummaryItem
+          icon="flag-outline"
           label="Objectifs"
           value={tripGoals.map(g => g === 'autre' ? tripGoalOther : g).join(', ')}
         />
@@ -425,7 +466,8 @@ export default function NewTripScreen() {
         style={styles.modifyButton}
         onPress={() => setCurrentStep(1)}
       >
-        <Text style={styles.modifyButtonText}>✏️ Modifier</Text>
+        <Ionicons name="create-outline" size={18} color={colors.primary} />
+        <Text style={styles.modifyButtonText}>Modifier</Text>
       </TouchableOpacity>
     </View>
   );
@@ -433,18 +475,19 @@ export default function NewTripScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Créer un nouveau voyage</Text>
-        <TouchableOpacity onPress={handleClose}>
-          <Text style={styles.closeButton}>✕</Text>
+        <Text style={styles.title}>Nouveau voyage</Text>
+        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+          <Ionicons name="close" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
       {renderStepIndicator()}
 
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
@@ -459,7 +502,8 @@ export default function NewTripScreen() {
             style={[styles.navButton, styles.navButtonSecondary]}
             onPress={handlePrevious}
           >
-            <Text style={styles.navButtonTextSecondary}>← Précédent</Text>
+            <Ionicons name="arrow-back" size={18} color={colors.textPrimary} />
+            <Text style={styles.navButtonTextSecondary}>Précédent</Text>
           </TouchableOpacity>
         )}
 
@@ -468,7 +512,8 @@ export default function NewTripScreen() {
             style={[styles.navButton, styles.navButtonPrimary]}
             onPress={handleNext}
           >
-            <Text style={styles.navButtonText}>Suivant →</Text>
+            <Text style={styles.navButtonText}>Suivant</Text>
+            <Ionicons name="arrow-forward" size={18} color={colors.textInverse} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -477,9 +522,12 @@ export default function NewTripScreen() {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.textInverse} />
             ) : (
-              <Text style={styles.navButtonText}>Créer le voyage</Text>
+              <>
+                <Ionicons name="airplane" size={18} color={colors.textInverse} />
+                <Text style={styles.navButtonText}>Créer le voyage</Text>
+              </>
             )}
           </TouchableOpacity>
         )}
@@ -488,53 +536,124 @@ export default function NewTripScreen() {
   );
 }
 
-const SummaryItem = ({ label, value }: { label: string; value: string }) => (
-  <View style={styles.summaryItem}>
-    <Text style={styles.summaryLabel}>{label}:</Text>
-    <Text style={styles.summaryValue}>{value}</Text>
+const SummaryItem = ({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) => (
+  <View style={summaryStyles.item}>
+    <View style={summaryStyles.iconContainer}>
+      <Ionicons name={icon} size={16} color={colors.primary} />
+    </View>
+    <View style={summaryStyles.textContainer}>
+      <Text style={summaryStyles.label}>{label}</Text>
+      <Text style={summaryStyles.value}>{value}</Text>
+    </View>
   </View>
 );
+
+const summaryStyles = StyleSheet.create({
+  item: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primarySurface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  label: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginBottom: 2,
+  },
+  value: {
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: colors.border,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    ...typography.h2,
+    color: colors.textPrimary,
   },
   closeButton: {
-    fontSize: 24,
-    color: '#666',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+
+  // Step indicator
   stepIndicator: {
-    padding: 16,
-    backgroundColor: '#f9f9f9',
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.surface,
   },
-  stepText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  progressBar: {
-    height: 4,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 2,
-    overflow: 'hidden',
+  stepDotContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
+  stepDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.border,
   },
+  stepDotActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  stepDotCompleted: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  stepDotText: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    fontWeight: '600',
+  },
+  stepDotTextActive: {
+    color: colors.textInverse,
+  },
+  stepLine: {
+    width: 30,
+    height: 2,
+    backgroundColor: colors.border,
+    marginHorizontal: 2,
+  },
+  stepLineActive: {
+    backgroundColor: colors.success,
+  },
+
   content: {
     flex: 1,
   },
@@ -542,208 +661,206 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   stepContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxxl,
   },
   stepTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    ...typography.h1,
+    color: colors.textPrimary,
+    marginBottom: spacing.xxl,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-  },
+
+  // Form
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    marginTop: 16,
+    ...typography.labelMedium,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  hint: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginBottom: spacing.md,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    ...componentStyles.input,
   },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
+  inputError: {
+    borderColor: colors.danger,
+    backgroundColor: colors.dangerLight,
   },
+  fieldError: {
+    ...typography.caption,
+    color: colors.danger,
+    marginTop: spacing.xs,
+  },
+
+  // Autocomplete
   autocompleteContainer: {
     width: '100%',
   },
-  autocompleteInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
   autocompleteList: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginTop: 4,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.xs,
   },
   autocompleteRow: {
-    padding: 12,
+    padding: spacing.md,
   },
   autocompleteDescription: {
-    fontSize: 14,
+    ...typography.bodySmall,
+    color: colors.textPrimary,
   },
+
+  // Date
   dateButton: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#000',
-  },
-  dateButtonPlaceholder: {
-    fontSize: 16,
-    color: '#999',
-  },
-  radioGroup: {
-    marginBottom: 16,
-  },
-  radioButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  dateButtonText: {
+    ...typography.bodyLarge,
+    color: colors.textPrimary,
+  },
+  dateButtonPlaceholder: {
+    ...typography.bodyLarge,
+    color: colors.textTertiary,
+  },
+
+  // Radio
+  radioGroup: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  radioButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  radioButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySurface,
   },
   radio: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#007AFF',
-    marginRight: 10,
+    borderColor: colors.border,
+    marginRight: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  radioActive: {
+    borderColor: colors.primary,
   },
   radioSelected: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
   },
   radioLabel: {
-    fontSize: 16,
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
-  buttonGroup: {
-    marginTop: 8,
+  radioLabelActive: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+
+  // Options (group type, goals)
+  optionGroup: {
+    gap: spacing.sm,
   },
   optionButton: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
   },
   optionButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   optionButtonText: {
-    fontSize: 16,
+    ...typography.bodyMedium,
     textAlign: 'center',
+    color: colors.textPrimary,
   },
   optionButtonTextSelected: {
-    color: '#fff',
+    color: colors.textInverse,
     fontWeight: '600',
   },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    borderRadius: 4,
-    marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkmark: {
-    color: '#007AFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  checkboxLabel: {
-    fontSize: 16,
-  },
+
+  // Summary
   summary: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 16,
-    marginTop: 16,
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginRight: 8,
-    minWidth: 120,
-  },
-  summaryValue: {
-    fontSize: 14,
-    flex: 1,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    marginTop: spacing.lg,
   },
   modifyButton: {
-    marginTop: 20,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xl,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
   },
   modifyButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.labelMedium,
+    color: colors.primary,
   },
+
+  // Navigation
   navigation: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    backgroundColor: '#fff',
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+    gap: spacing.sm,
   },
   navButton: {
     flex: 1,
-    padding: 14,
-    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 4,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
   },
   navButtonPrimary: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
   },
   navButtonSecondary: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surfaceSecondary,
   },
   navButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.labelMedium,
+    color: colors.textInverse,
   },
   navButtonTextSecondary: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.labelMedium,
+    color: colors.textPrimary,
   },
 });
