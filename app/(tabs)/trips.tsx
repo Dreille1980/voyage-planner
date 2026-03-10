@@ -228,6 +228,14 @@ export default function TripsScreen() {
                 <ActionMenu
                   items={[
                     {
+                      label: 'Réservations',
+                      icon: 'receipt-outline',
+                      onPress: () => {
+                        setCurrentTrip(item);
+                        router.push('/reservations');
+                      },
+                    },
+                    {
                       label: 'Supprimer',
                       icon: 'trash-outline',
                       onPress: () => handleDeleteTrip(item),

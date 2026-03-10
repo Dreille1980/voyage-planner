@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useCurrentTrip } from '../../contexts/TripContext';
-import { getAllChecklistsForTrip, regenerateChecklist, updateChecklistItem } from '../../services/api';
+import { getAllChecklistsForTrip, regenerateChecklist, updateChecklistItem, addChecklistItem } from '../../services/api';
 import type { Checklist, ChecklistType, ChecklistItem } from '../../types/api';
 import ProgressBar from '../../components/ProgressBar';
 import { colors, typography, spacing, borderRadius, shadows, componentStyles } from '../../theme';
@@ -36,6 +36,8 @@ export default function ChecklistScreen() {
   const [expandedLists, setExpandedLists] = useState<Set<string>>(new Set(['preparatifs']));
   const [editingDeadline, setEditingDeadline] = useState<string | null>(null);
   const [tempDeadline, setTempDeadline] = useState('');
+  const [addingItemCategory, setAddingItemCategory] = useState<string | null>(null);
+  const [newItemLabel, setNewItemLabel] = useState('');
 
   useEffect(() => {
     if (currentTrip) {
@@ -119,6 +121,18 @@ export default function ChecklistScreen() {
       loadChecklists();
     } catch (err) {
       Alert.alert('Erreur', 'Impossible de mettre à jour la deadline');
+    }
+  };
+
+  const handleAddItem = async (categoryId: string) => {
+    if (!newItemLabel.trim()) return;
+    try {
+      await addChecklistItem(categoryId, newItemLabel.trim());
+      setNewItemLabel('');
+      setAddingItemCategory(null);
+      loadChecklists();
+    } catch (err) {
+      Alert.alert('Erreur', "Impossible d'ajouter l'item");
     }
   };
 
@@ -245,6 +259,42 @@ export default function ChecklistScreen() {
               <View key={category.id} style={styles.category}>
                 <Text style={styles.categoryName}>{category.name}</Text>
                 {category.items.map((item) => renderItem(item, checklist.checklistType))}
+
+                {/* Add item UI */}
+                {addingItemCategory === category.id ? (
+                  <View style={styles.addItemRow}>
+                    <TextInput
+                      style={styles.addItemInput}
+                      value={newItemLabel}
+                      onChangeText={setNewItemLabel}
+                      placeholder="Nouvel item..."
+                      placeholderTextColor={colors.textTertiary}
+                      autoFocus
+                      onSubmitEditing={() => handleAddItem(category.id)}
+                      returnKeyType="done"
+                    />
+                    <TouchableOpacity
+                      onPress={() => handleAddItem(category.id)}
+                      style={styles.addItemConfirm}
+                    >
+                      <Ionicons name="checkmark" size={16} color={colors.textInverse} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => { setAddingItemCategory(null); setNewItemLabel(''); }}
+                      style={styles.addItemCancel}
+                    >
+                      <Ionicons name="close" size={16} color={colors.textInverse} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.addItemButton}
+                    onPress={() => { setAddingItemCategory(category.id); setNewItemLabel(''); }}
+                  >
+                    <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+                    <Text style={styles.addItemButtonText}>Ajouter un item</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ))}
           </View>
@@ -561,6 +611,53 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Add item
+  addItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  addItemButtonText: {
+    ...typography.bodySmall,
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  addItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  addItemInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...typography.bodySmall,
+    color: colors.textPrimary,
+  },
+  addItemConfirm: {
+    backgroundColor: colors.success,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addItemCancel: {
+    backgroundColor: colors.textTertiary,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
   },
