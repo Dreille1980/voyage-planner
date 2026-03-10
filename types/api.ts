@@ -89,7 +89,7 @@ export interface UpdateChecklistItemInput {
 }
 
 // AI Actions
-export type AIAction = "generate_checklist" | "destination_info" | "trip_qna";
+export type AIAction = "generate_checklist" | "destination_info" | "trip_qna" | "generate_itinerary";
 
 export interface TripProfile {
   destination: string;
@@ -145,4 +145,79 @@ export interface SendChatMessageResponse {
     createdAt: string;
   };
   isRelevant: boolean;
+}
+
+// Itinerary types
+export interface ItineraryActivity {
+  id: string;
+  time: string;
+  title: string;
+  description: string;
+  type: "visit" | "food" | "transport" | "leisure" | "shopping" | "other";
+  duration?: string;
+  tips?: string;
+}
+
+export interface ItineraryDay {
+  dayNumber: number;
+  title: string;
+  activities: ItineraryActivity[];
+}
+
+export interface Itinerary {
+  id: string;
+  tripId: string;
+  days: ItineraryDay[];
+  updatedAt: string;
+}
+
+// Reservation types
+export type ReservationType = "flight" | "hotel" | "car" | "activity" | "restaurant" | "transport" | "other";
+
+export interface Reservation {
+  id: string;
+  tripId: string;
+  type: ReservationType;
+  title: string;
+  confirmationNumber: string | null;
+  provider: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateReservationInput {
+  type: ReservationType;
+  title: string;
+  confirmationNumber?: string;
+  provider?: string;
+  startDate?: string;
+  endDate?: string;
+  notes?: string;
+}
+
+export interface UpdateReservationInput extends Partial<CreateReservationInput> {}
+
+// Weather types
+export interface WeatherData {
+  city: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+  current?: {
+    temperature_2m: number;
+    weathercode: number;
+    apparent_temperature: number;
+    relative_humidity_2m: number;
+    wind_speed_10m: number;
+  };
+  daily?: {
+    time: string[];
+    temperature_2m_max: number[];
+    temperature_2m_min: number[];
+    precipitation_sum: number[];
+    weathercode: number[];
+  };
 }

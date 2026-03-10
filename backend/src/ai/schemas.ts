@@ -4,6 +4,7 @@ export const ActionSchema = z.enum([
   "generate_checklist",
   "destination_info",
   "trip_qna",
+  "generate_itinerary",
 ]);
 
 export const TripProfileSchema = z

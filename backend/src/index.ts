@@ -13,6 +13,8 @@ import { createTrip, getAllTripsForUser, getTripById, updateTrip, deleteTrip } f
 import { getAllChecklistsForTrip, getChecklistByType, saveChecklist, updateChecklistItem, deleteChecklistItem } from "./db/checklistHandlers";
 import { getDestinationInfo, saveDestinationInfo } from "./db/destinationHandlers";
 import { getChatMessages, saveChatMessage, getTodayMessageCount } from "./db/chatHandlers";
+import { getItinerary, saveItinerary, addItineraryActivity, updateItineraryActivity, deleteItineraryActivity } from "./db/itineraryHandlers";
+import { getReservationsForTrip, createReservation, updateReservation, deleteReservation } from "./db/reservationHandlers";
 import { requireAuth } from "./auth/middleware";
 import {
   handleRegister,
@@ -172,7 +174,7 @@ app.post("/trips", requireAuth, async (req, res) => {
       })),
     };
 
-    // Generate checklists and destination info in background - don't await
+    // Generate checklists, destination info, and itinerary in background - don't await
     Promise.all([
       // Generate 3 checklists
       handleAi({ action: "generate_checklist", tripProfile, checklistType: "preparatifs", userLanguage })
@@ -191,6 +193,11 @@ app.post("/trips", requireAuth, async (req, res) => {
       handleAi({ action: "destination_info", tripProfile, userLanguage })
         .then((result: any) => saveDestinationInfo(trip.id, { sections: result.sections }))
         .catch(err => console.error("Failed to generate destination info:", err)),
+
+      // Generate itinerary
+      handleAi({ action: "generate_itinerary", tripProfile: { ...tripProfile, numberOfDays: trip.numberOfDays }, userLanguage })
+        .then((result: any) => saveItinerary(trip.id, { days: result.days }))
+        .catch(err => console.error("Failed to generate itinerary:", err)),
     ]);
 
     res.status(201).json(trip);
@@ -419,12 +426,12 @@ app.post("/trips/:tripId/chat", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    // Check daily limit (5 questions per day)
+    // Check daily limit (15 questions per day)
     const todayCount = await getTodayMessageCount(tripId);
-    if (todayCount >= 5) {
+    if (todayCount >= 15) {
       return res.status(429).json({
         error: "Limite quotidienne atteinte",
-        message: "Vous avez atteint la limite de 5 questions par jour pour ce voyage. Réessayez demain!",
+        message: "Vous avez atteint la limite de 15 questions par jour pour ce voyage. Réessayez demain!",
       });
     }
 
@@ -492,6 +499,284 @@ app.post("/trips/:tripId/chat", requireAuth, async (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to process chat message", message: err.message });
+  }
+});
+
+// === ITINERARY ===
+
+// GET /trips/:tripId/itinerary - Get itinerary for a trip
+app.get("/trips/:tripId/itinerary", requireAuth, async (req, res) => {
+  try {
+    const itinerary = await getItinerary(req.params.tripId as string);
+    if (!itinerary) {
+      return res.status(404).json({ error: "Itinerary not found" });
+    }
+    res.json(itinerary);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch itinerary", message: err.message });
+  }
+});
+
+// POST /trips/:tripId/itinerary/regenerate - Regenerate itinerary
+app.post("/trips/:tripId/itinerary/regenerate", requireAuth, async (req, res) => {
+  try {
+    const tripId = req.params.tripId as string;
+    const trip = await getTripById(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: "Trip not found" });
+    }
+
+    const userLanguage = getUserLanguage(req);
+    const tripProfile = {
+      destination: trip.destination,
+      startDate: trip.startDate || undefined,
+      endDate: trip.endDate || undefined,
+      numberOfDays: trip.numberOfDays || undefined,
+      tripType: trip.tripType || undefined,
+      style: trip.style || undefined,
+      budgetRange: trip.budgetRange || undefined,
+      travelers: trip.travelers?.map(t => ({
+        name: t.name,
+        ageGroup: t.ageGroup,
+        notes: t.notes,
+      })),
+    };
+
+    const result = await handleAi({ action: "generate_itinerary", tripProfile, userLanguage });
+    const itinerary = await saveItinerary(tripId, { days: result.days });
+    res.json(itinerary);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to regenerate itinerary", message: err.message });
+  }
+});
+
+// POST /trips/:tripId/itinerary/days/:dayNumber/activities - Add activity to a day
+app.post("/trips/:tripId/itinerary/days/:dayNumber/activities", requireAuth, async (req, res) => {
+  try {
+    const { time, title, description, type, duration, tips } = req.body;
+    if (!time || !title || !description || !type) {
+      return res.status(400).json({ error: "time, title, description, and type are required" });
+    }
+    const itinerary = await addItineraryActivity(
+      req.params.tripId as string,
+      parseInt(req.params.dayNumber as string),
+      { time, title, description, type, duration, tips }
+    );
+    if (!itinerary) {
+      return res.status(404).json({ error: "Itinerary or day not found" });
+    }
+    res.json(itinerary);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to add activity", message: err.message });
+  }
+});
+
+// PUT /trips/:tripId/itinerary/days/:dayNumber/activities/:activityId - Update activity
+app.put("/trips/:tripId/itinerary/days/:dayNumber/activities/:activityId", requireAuth, async (req, res) => {
+  try {
+    const itinerary = await updateItineraryActivity(
+      req.params.tripId as string,
+      parseInt(req.params.dayNumber as string),
+      req.params.activityId as string,
+      req.body
+    );
+    if (!itinerary) {
+      return res.status(404).json({ error: "Itinerary, day, or activity not found" });
+    }
+    res.json(itinerary);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update activity", message: err.message });
+  }
+});
+
+// DELETE /trips/:tripId/itinerary/days/:dayNumber/activities/:activityId - Delete activity
+app.delete("/trips/:tripId/itinerary/days/:dayNumber/activities/:activityId", requireAuth, async (req, res) => {
+  try {
+    const itinerary = await deleteItineraryActivity(
+      req.params.tripId as string,
+      parseInt(req.params.dayNumber as string),
+      req.params.activityId as string
+    );
+    if (!itinerary) {
+      return res.status(404).json({ error: "Itinerary, day, or activity not found" });
+    }
+    res.json(itinerary);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete activity", message: err.message });
+  }
+});
+
+// === RESERVATIONS ===
+
+// GET /trips/:tripId/reservations - Get all reservations for a trip
+app.get("/trips/:tripId/reservations", requireAuth, async (req, res) => {
+  try {
+    const reservations = await getReservationsForTrip(req.params.tripId as string);
+    res.json(reservations);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch reservations", message: err.message });
+  }
+});
+
+// POST /trips/:tripId/reservations - Create a reservation
+app.post("/trips/:tripId/reservations", requireAuth, async (req, res) => {
+  try {
+    const { type, title, confirmationNumber, provider, startDate, endDate, notes } = req.body;
+    if (!type || !title) {
+      return res.status(400).json({ error: "type and title are required" });
+    }
+    const reservation = await createReservation(req.params.tripId as string, {
+      type, title, confirmationNumber, provider, startDate, endDate, notes
+    });
+    res.status(201).json(reservation);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to create reservation", message: err.message });
+  }
+});
+
+// PUT /reservations/:id - Update a reservation
+app.put("/reservations/:id", requireAuth, async (req, res) => {
+  try {
+    const reservation = await updateReservation(req.params.id as string, req.body);
+    if (!reservation) {
+      return res.status(404).json({ error: "Reservation not found" });
+    }
+    res.json(reservation);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update reservation", message: err.message });
+  }
+});
+
+// DELETE /reservations/:id - Delete a reservation
+app.delete("/reservations/:id", requireAuth, async (req, res) => {
+  try {
+    const success = await deleteReservation(req.params.id as string);
+    if (!success) {
+      return res.status(404).json({ error: "Reservation not found" });
+    }
+    res.status(204).send();
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete reservation", message: err.message });
+  }
+});
+
+// === ADD CHECKLIST ITEM ===
+
+// POST /checklists/categories/:categoryId/items - Add a custom item to a checklist category
+app.post("/checklists/categories/:categoryId/items", requireAuth, async (req, res) => {
+  try {
+    const { label } = req.body;
+    if (!label || typeof label !== "string" || !label.trim()) {
+      return res.status(400).json({ error: "label is required" });
+    }
+
+    const { randomUUID } = await import("crypto");
+    const db = getDatabase();
+    const categoryId = req.params.categoryId as string;
+    const usePostgres = !!process.env.DATABASE_URL;
+
+    if (usePostgres) {
+      const { Pool } = await import("pg");
+      const pool = db as InstanceType<typeof Pool>;
+
+      // Get max order_index for this category
+      const maxResult = await pool.query(
+        `SELECT COALESCE(MAX(order_index), -1) as max_index FROM checklist_items WHERE category_id = $1`,
+        [categoryId]
+      );
+      const nextIndex = (maxResult.rows[0]?.max_index ?? -1) + 1;
+
+      const id = randomUUID();
+      await pool.query(
+        `INSERT INTO checklist_items (id, category_id, label, checked, assigned_to_age_group, deadline, order_index)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [id, categoryId, label.trim(), false, null, null, nextIndex]
+      );
+
+      const result = await pool.query(
+        `SELECT id, label, checked, assigned_to_age_group as "assignedToAgeGroup",
+                deadline, order_index as "orderIndex"
+         FROM checklist_items WHERE id = $1`,
+        [id]
+      );
+      res.status(201).json(result.rows[0]);
+    } else {
+      const sqlite = db as any;
+
+      // Get max orderIndex for this category
+      const maxRow = sqlite
+        .prepare(`SELECT COALESCE(MAX(orderIndex), -1) as maxIndex FROM checklist_items WHERE categoryId = ?`)
+        .get(categoryId) as any;
+      const nextIndex = (maxRow?.maxIndex ?? -1) + 1;
+
+      const id = randomUUID();
+      sqlite
+        .prepare(
+          `INSERT INTO checklist_items (id, categoryId, label, checked, assignedToAgeGroup, deadline, orderIndex)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(id, categoryId, label.trim(), 0, null, null, nextIndex);
+
+      const item = sqlite.prepare("SELECT * FROM checklist_items WHERE id = ?").get(id) as any;
+      res.status(201).json({
+        id: item.id,
+        label: item.label,
+        checked: item.checked === 1,
+        assignedToAgeGroup: item.assignedToAgeGroup,
+        deadline: item.deadline,
+        orderIndex: item.orderIndex,
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to add checklist item", message: err.message });
+  }
+});
+
+// === WEATHER PROXY ===
+
+// GET /weather?lat=XX&lon=XX or GET /weather?city=CityName
+app.get("/weather", requireAuth, async (req, res) => {
+  try {
+    const { city, lat, lon } = req.query;
+
+    // Use Open-Meteo (free, no API key required)
+    let url: string;
+
+    if (lat && lon) {
+      url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=auto&forecast_days=7`;
+    } else if (city) {
+      // First geocode the city using Open-Meteo geocoding
+      const geoResponse = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city as string)}&count=1&language=fr`
+      );
+      const geoData = await geoResponse.json() as any;
+
+      if (!geoData.results || geoData.results.length === 0) {
+        return res.status(404).json({ error: "City not found" });
+      }
+
+      const { latitude, longitude, name, country } = geoData.results[0];
+      url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=auto&forecast_days=7&current=temperature_2m,weathercode,apparent_temperature,relative_humidity_2m,wind_speed_10m`;
+
+      const weatherResponse = await fetch(url);
+      const weatherData = await weatherResponse.json();
+
+      return res.json({
+        city: name,
+        country,
+        latitude,
+        longitude,
+        ...weatherData,
+      });
+    } else {
+      return res.status(400).json({ error: "city or lat/lon required" });
+    }
+
+    const weatherResponse = await fetch(url);
+    const weatherData = await weatherResponse.json();
+    res.json(weatherData);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch weather", message: err.message });
   }
 });
 

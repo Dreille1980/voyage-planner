@@ -13,6 +13,11 @@ import type {
   TripQnAResponse,
   ChatMessage,
   SendChatMessageResponse,
+  Itinerary,
+  Reservation,
+  CreateReservationInput,
+  UpdateReservationInput,
+  WeatherData,
 } from "../types/api";
 
 const API_URL = config.apiUrl;
@@ -243,6 +248,96 @@ export async function sendChatMessage(
     method: "POST",
     body: JSON.stringify({ message }),
   });
+}
+
+// ===== ITINERARY =====
+
+export async function getItinerary(tripId: string): Promise<Itinerary | null> {
+  try {
+    return await fetchAPI<Itinerary>(`/trips/${tripId}/itinerary`);
+  } catch (error) {
+    if ((error as Error).message.includes("404")) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function regenerateItinerary(tripId: string): Promise<Itinerary> {
+  return fetchAPI<Itinerary>(`/trips/${tripId}/itinerary/regenerate`, {
+    method: "POST",
+  });
+}
+
+export async function addItineraryActivity(
+  tripId: string,
+  dayNumber: number,
+  activity: { time: string; title: string; description: string; type: string; duration?: string; tips?: string }
+): Promise<Itinerary> {
+  return fetchAPI<Itinerary>(`/trips/${tripId}/itinerary/days/${dayNumber}/activities`, {
+    method: "POST",
+    body: JSON.stringify(activity),
+  });
+}
+
+export async function deleteItineraryActivity(
+  tripId: string,
+  dayNumber: number,
+  activityId: string
+): Promise<Itinerary> {
+  return fetchAPI<Itinerary>(`/trips/${tripId}/itinerary/days/${dayNumber}/activities/${activityId}`, {
+    method: "DELETE",
+  });
+}
+
+// ===== RESERVATIONS =====
+
+export async function getReservationsForTrip(tripId: string): Promise<Reservation[]> {
+  return fetchAPI<Reservation[]>(`/trips/${tripId}/reservations`);
+}
+
+export async function createReservation(
+  tripId: string,
+  data: CreateReservationInput
+): Promise<Reservation> {
+  return fetchAPI<Reservation>(`/trips/${tripId}/reservations`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateReservation(
+  id: string,
+  data: UpdateReservationInput
+): Promise<Reservation> {
+  return fetchAPI<Reservation>(`/reservations/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteReservation(id: string): Promise<void> {
+  return fetchAPI<void>(`/reservations/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// ===== ADD CHECKLIST ITEM =====
+
+export async function addChecklistItem(
+  categoryId: string,
+  label: string
+): Promise<ChecklistItem> {
+  return fetchAPI<ChecklistItem>(`/checklists/categories/${categoryId}/items`, {
+    method: "POST",
+    body: JSON.stringify({ label }),
+  });
+}
+
+// ===== WEATHER =====
+
+export async function getWeather(city: string): Promise<WeatherData> {
+  return fetchAPI<WeatherData>(`/weather?city=${encodeURIComponent(city)}`);
 }
 
 // ===== HEALTH CHECK =====

@@ -14,9 +14,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { createTrip } from '../../services/api';
-import type { CreateTripInput, GroupType, TripGoal, Pace } from '../../types/api';
+import type { CreateTripInput, GroupType, TripGoal, Pace, Traveler, AgeGroup } from '../../types/api';
 import { colors, typography, spacing, borderRadius, componentStyles, shadows } from '../../theme';
 
 type DateMode = 'exact' | 'duration';
@@ -205,32 +204,12 @@ export default function NewTripScreen() {
       {errors.name && <Text style={styles.fieldError}>{errors.name}</Text>}
 
       <Text style={styles.label}>Destination *</Text>
-      <GooglePlacesAutocomplete
-        placeholder="Rechercher une ville..."
-        onPress={(data) => {
-          setDestination(data.description);
-          clearError('destination');
-        }}
-        query={{
-          key: 'YOUR_GOOGLE_PLACES_API_KEY',
-          language: 'fr',
-          types: '(cities)',
-        }}
-        fetchDetails={false}
-        styles={{
-          textInputContainer: styles.autocompleteContainer,
-          textInput: [styles.input, errors.destination && styles.inputError],
-          listView: styles.autocompleteList,
-          row: styles.autocompleteRow,
-          description: styles.autocompleteDescription,
-        }}
-        textInputProps={{
-          value: destination,
-          onChangeText: (text: string) => { setDestination(text); clearError('destination'); },
-          placeholderTextColor: colors.textTertiary,
-        }}
-        enablePoweredByContainer={false}
-        debounce={300}
+      <TextInput
+        style={[styles.input, errors.destination && styles.inputError]}
+        value={destination}
+        onChangeText={(text) => { setDestination(text); clearError('destination'); }}
+        placeholder="Ex: Rome, Italie"
+        placeholderTextColor={colors.textTertiary}
       />
       {errors.destination && <Text style={styles.fieldError}>{errors.destination}</Text>}
     </View>

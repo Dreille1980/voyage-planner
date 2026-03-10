@@ -231,6 +231,76 @@ Rules:
     return obj;
   }
 
+  if (req.action === "generate_itinerary") {
+    // Calculate number of days
+    let numberOfDays = 3; // default
+    if (req.tripProfile.startDate && req.tripProfile.endDate) {
+      const start = new Date(req.tripProfile.startDate);
+      const end = new Date(req.tripProfile.endDate);
+      numberOfDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    } else if ((req.tripProfile as any).numberOfDays) {
+      numberOfDays = (req.tripProfile as any).numberOfDays;
+    }
+
+    // Cap at 14 days to avoid huge prompts
+    numberOfDays = Math.min(numberOfDays, 14);
+
+    const prompt = `
+You are generating a day-by-day travel itinerary.
+Return STRICT JSON only. No markdown. No extra text.
+
+IMPORTANT: Generate ALL content in ${languageName}.
+
+Trip profile:
+${JSON.stringify(req.tripProfile)}
+
+Number of days: ${numberOfDays}
+
+Required JSON format:
+{
+  "days": [
+    {
+      "dayNumber": 1,
+      "title": "Day title in ${languageName} (e.g. 'Arrivée et découverte du centre-ville')",
+      "activities": [
+        {
+          "time": "09:00",
+          "title": "Activity title in ${languageName}",
+          "description": "Short description (1-2 sentences) in ${languageName}",
+          "type": "visit|food|transport|leisure|shopping|other",
+          "duration": "2h",
+          "tips": "Optional practical tip in ${languageName}"
+        }
+      ]
+    }
+  ]
+}
+
+Rules:
+- Generate exactly ${numberOfDays} days
+- Each day should have 4 to 7 activities
+- Include a mix of visits, food (local restaurants), transport, and leisure
+- Activities should be realistic and specific to ${req.tripProfile.destination}
+- Use real place names, neighborhoods, and landmarks
+- Include meal recommendations (breakfast, lunch, dinner) with specific restaurant suggestions or local food spots
+- Times should be realistic and flow logically through the day (morning → evening)
+- If travelers include kids/baby, adapt activities accordingly
+- First day should account for arrival, last day for departure
+- Include practical tips when useful (e.g., "book in advance", "arrive early to avoid crowds")
+- ALL text content MUST be in ${languageName}
+`;
+
+    const r = await openai.chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.5,
+    });
+
+    const content = r.choices[0]?.message?.content ?? "{}";
+    return safeJsonParse(content);
+  }
+
   if (req.action === "trip_qna") {
     // Messages par défaut selon la langue
     type LocalizedMessages = { empty: string; notRelevant: string; error: string };

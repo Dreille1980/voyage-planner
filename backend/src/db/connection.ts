@@ -143,6 +143,35 @@ async function initializePostgresTables() {
       )
     `);
 
+    // Table: itineraries (AI-generated day-by-day itineraries)
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS itineraries (
+        id TEXT PRIMARY KEY,
+        trip_id TEXT NOT NULL UNIQUE,
+        content TEXT NOT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Table: reservations (flights, hotels, car rentals, etc.)
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS reservations (
+        id TEXT PRIMARY KEY,
+        trip_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        confirmation_number TEXT,
+        provider TEXT,
+        start_date TEXT,
+        end_date TEXT,
+        notes TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log("✅ PostgreSQL tables initialized");
   } catch (error) {
     console.error("❌ Error initializing PostgreSQL tables:", error);
@@ -257,6 +286,35 @@ function initializeSQLiteTables() {
       role TEXT NOT NULL,
       content TEXT NOT NULL,
       createdAt TEXT NOT NULL,
+      FOREIGN KEY (tripId) REFERENCES trips(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Table: itineraries (AI-generated day-by-day itineraries)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS itineraries (
+      id TEXT PRIMARY KEY,
+      tripId TEXT NOT NULL UNIQUE,
+      content TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      FOREIGN KEY (tripId) REFERENCES trips(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Table: reservations (flights, hotels, car rentals, etc.)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reservations (
+      id TEXT PRIMARY KEY,
+      tripId TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      confirmationNumber TEXT,
+      provider TEXT,
+      startDate TEXT,
+      endDate TEXT,
+      notes TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
       FOREIGN KEY (tripId) REFERENCES trips(id) ON DELETE CASCADE
     )
   `);
