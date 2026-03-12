@@ -1,54 +1,62 @@
 # 📱 Build Status - Voyage Planner
 
-## 🎯 Build #4 - EN COURS DE SOUMISSION
+## 🎯 Build #5 - EN COURS DE COMPILATION
 
-**Status**: ✅ Build terminé, 🔄 Soumission à TestFlight en cours
-**Icône**: ✅ Icône personnalisée (globe + avion + valise + pin rouge)
-**BuildNumber**: 4
+**Status**: 🔄 Build en cours de compilation (~15-20 minutes)
+**BuildNumber**: 5
 **Version**: 1.0.0
-**Lien**: https://expo.dev/accounts/dreille/projects/voyage-planner/builds/84aea0b8-316a-490f-9ebf-a35f9a85262c
-**Submission**: https://expo.dev/accounts/dreille/projects/voyage-planner/submissions/a478d5ff-f4b4-4269-a452-d59ed3154c82
+**Démarré**: 3 novembre 2026, 22:58
+**Lien**: https://expo.dev/accounts/dreille/projects/voyage-planner/builds/40e2ef25-aa53-4968-be3e-6b3a44b1ab78
 
-### Ce qui a été fait pour Build #4:
-- ✅ Icône personnalisée copiée depuis Downloads (1.3M)
-- ✅ assets/icon.png remplacée
-- ✅ assets/adaptive-icon.png remplacée
-- ✅ buildNumber incrémenté à 4 dans app.json
-- ✅ Changements committés et poussés vers GitHub
-- ⏳ Build en cours de compilation (~15-20 minutes)
+### Ce qui a été fait pour Build #5:
+- ✅ buildNumber incrémenté à 5 dans app.json
+- ✅ Changements committés et poussés vers GitHub (commit 28d9462)
+- ✅ Build lancé sur EAS
+- ⏳ Compilation en cours (~15-20 minutes)
+- ⏳ Soumission à TestFlight à faire manuellement après compilation
+
+### Note importante:
+La soumission automatique à TestFlight n'a pas fonctionné car l'`ascAppId` n'est pas configuré dans `eas.json`. 
+Après la compilation, vous pourrez soumettre manuellement avec:
+```bash
+npx eas submit --platform ios
+```
 
 ## 📊 Historique des Builds
 
+### Build #4
+- **Status**: ✅ Soumis à TestFlight
+- **BuildNumber**: 4
+- **Lien**: https://expo.dev/accounts/dreille/projects/voyage-planner/builds/84aea0b8-316a-490f-9ebf-a35f9a85262c
+
 ### Build #3
 - **Status**: ✅ Soumis à TestFlight
-- **Icône**: ⚠️ Icône par défaut Expo
 - **BuildNumber**: 3
-- **Soumis**: 5 mars 2026, 17:27
-- **Processing**: En cours de traitement par Apple (5-10 minutes)
-- **URL TestFlight**: https://appstoreconnect.apple.com/apps/6758285141/testflight/ios
+- **Soumis**: 5 mars 2026
 
-### Build #4 (Actuel)
+### Build #5 (Actuel)
 - **Status**: ⏳ En cours de compilation
-- **Icône**: ✅ Icône personnalisée
-- **BuildNumber**: 4
-- **Démarré**: 5 mars 2026, 18:06
-- **Estimation**: Prêt vers 18:21-18:26
+- **BuildNumber**: 5
+- **Démarré**: 3 novembre 2026, 22:58
+- **Estimation**: Prêt vers 23:13-23:18
 
 ## 📋 Prochaines étapes
 
-Une fois le Build #4 terminé:
-1. ⏳ Attendre la fin de la compilation (~10 minutes restantes)
-2. ⏳ Soumettre Build #4 à TestFlight
-3. ⏳ Attendre le traitement Apple (5-10 minutes)
-4. ✅ Tester l'app avec la belle icône!
+Une fois le Build #5 terminé:
+1. ⏳ Attendre la fin de la compilation (~15-20 minutes)
+2. ⏳ Vérifier que le build est réussi sur EAS
+3. ⏳ Soumettre à TestFlight avec: `npx eas submit --platform ios`
+4. ⏳ Attendre le traitement Apple (5-10 minutes)
+5. ✅ Tester l'app sur TestFlight!
 
 ## 🔗 Liens utiles
 
+- **Build actuel**: https://expo.dev/accounts/dreille/projects/voyage-planner/builds/40e2ef25-aa53-4968-be3e-6b3a44b1ab78
+- **Tous les builds EAS**: https://expo.dev/accounts/dreille/projects/voyage-planner/builds
 - **TestFlight**: https://appstoreconnect.apple.com/apps/6758285141/testflight/ios
-- **EAS Builds**: https://expo.dev/accounts/dreille/projects/voyage-planner/builds
 - **GitHub**: https://github.com/Dreille1980/voyage-planner
-- **Privacy Policy**: https://dreille1980.github.io/voyage-planner/privacy-policy.html (à activer GitHub Pages)
+- **Privacy Policy**: https://dreille1980.github.io/voyage-planner/privacy-policy.html
 
 ---
 
-*Dernière mise à jour: 5 mars 2026, 18:07*
+*Dernière mise à jour: 3 novembre 2026, 22:58*
