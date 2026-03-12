@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
         "NSCameraUsageDescription": "Cette app n'utilise pas la caméra",
         "NSPhotoLibraryUsageDescription": "Cette app n'utilise pas vos photos",
