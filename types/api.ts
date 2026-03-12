@@ -200,6 +200,19 @@ export interface CreateReservationInput {
 
 export interface UpdateReservationInput extends Partial<CreateReservationInput> {}
 
+// Itinerary preferences types
+export type ItineraryBudget = "economique" | "moyen" | "eleve" | "luxe";
+export type ItineraryPace = "relax" | "equilibre" | "intensif";
+export type CulinaryPreference = "local" | "street_food" | "gastronomie" | "vegetarien" | "vegan" | "halal" | "kasher";
+
+export interface ItineraryPreferences {
+  budget?: ItineraryBudget;
+  pace?: ItineraryPace;
+  activities?: string[];
+  restrictions?: string;
+  culinaryPreferences?: CulinaryPreference[];
+}
+
 // Weather types
 export interface WeatherData {
   city: string;

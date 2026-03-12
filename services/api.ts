@@ -269,6 +269,30 @@ export async function regenerateItinerary(tripId: string): Promise<Itinerary> {
   });
 }
 
+// Generate itinerary with preferences
+export async function generateItineraryWithPreferences(
+  tripId: string,
+  preferences: import('../types/api').ItineraryPreferences
+): Promise<Itinerary> {
+  return fetchAPI<Itinerary>(`/trips/${tripId}/itinerary/regenerate`, {
+    method: "POST",
+    body: JSON.stringify({ preferences }),
+  });
+}
+
+// Update itinerary activity
+export async function updateItineraryActivity(
+  tripId: string,
+  dayNumber: number,
+  activityId: string,
+  updates: Partial<{ time: string; title: string; description: string; type: string; duration?: string; tips?: string }>
+): Promise<Itinerary> {
+  return fetchAPI<Itinerary>(`/trips/${tripId}/itinerary/days/${dayNumber}/activities/${activityId}`, {
+    method: "PUT",
+    body: JSON.stringify(updates),
+  });
+}
+
 export async function addItineraryActivity(
   tripId: string,
   dayNumber: number,

@@ -245,6 +245,58 @@ Rules:
     // Cap at 14 days to avoid huge prompts
     numberOfDays = Math.min(numberOfDays, 14);
 
+    // Extract itinerary preferences if provided
+    const preferences = (req.tripProfile as any).itineraryPreferences || {};
+    const budget = preferences.budget; // economique / moyen / eleve / luxe
+    const pace = preferences.pace; // relax / equilibre / intensif
+    const activities = preferences.activities || []; // Array of desired activities
+    const restrictions = preferences.restrictions; // Free text
+    const culinaryPreferences = preferences.culinaryPreferences || []; // Array of preferences
+
+    // Build preferences instructions
+    let preferencesInstructions = '';
+    
+    if (budget) {
+      const budgetGuide: Record<string, string> = {
+        economique: 'Budget-friendly options. Favor free/low-cost activities, local eateries, street food, public transport.',
+        moyen: 'Mid-range options. Mix of affordable and quality experiences, good restaurants, comfortable transport.',
+        eleve: 'High-quality options. Premium experiences, well-known restaurants, comfortable transport.',
+        luxe: 'Luxury options. Premium experiences, fine dining, private transport, exclusive activities.'
+      };
+      preferencesInstructions += `\nBudget: ${budgetGuide[budget] || budget}`;
+    }
+
+    if (pace) {
+      const paceGuide: Record<string, string> = {
+        relax: 'Relaxed pace. 2-3 activities per day max. Include rest time, leisurely meals, flexible schedule.',
+        equilibre: 'Balanced pace. 4-5 activities per day. Mix of sightseeing and relaxation.',
+        intensif: 'Intensive pace. 6-7 activities per day. Pack the schedule with sights and experiences.'
+      };
+      preferencesInstructions += `\nPace: ${paceGuide[pace] || pace}`;
+    }
+
+    if (activities.length > 0) {
+      preferencesInstructions += `\nMUST INCLUDE these activities/places: ${activities.join(', ')}. Make sure to incorporate them throughout the itinerary.`;
+    }
+
+    if (restrictions) {
+      preferencesInstructions += `\nRestrictions/Special needs: ${restrictions}. Adapt all activities and recommendations accordingly.`;
+    }
+
+    if (culinaryPreferences.length > 0) {
+      const culinaryMap: Record<string, string> = {
+        local: 'local authentic restaurants',
+        street_food: 'street food and food markets',
+        gastronomie: 'fine dining and gourmet experiences',
+        vegetarien: 'vegetarian-friendly options',
+        vegan: 'vegan options',
+        halal: 'halal restaurants',
+        kasher: 'kosher restaurants'
+      };
+      const culinaryText = culinaryPreferences.map((p: string) => culinaryMap[p] || p).join(', ');
+      preferencesInstructions += `\nCulinary preferences: Focus on ${culinaryText}. All meal recommendations must respect these preferences.`;
+    }
+
     const prompt = `
 You are generating a day-by-day travel itinerary.
 Return STRICT JSON only. No markdown. No extra text.
@@ -255,6 +307,8 @@ Trip profile:
 ${JSON.stringify(req.tripProfile)}
 
 Number of days: ${numberOfDays}
+
+USER PREFERENCES:${preferencesInstructions || '\nNone specified - use general best practices.'}
 
 Required JSON format:
 {

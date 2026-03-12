@@ -194,10 +194,7 @@ app.post("/trips", requireAuth, async (req, res) => {
         .then((result: any) => saveDestinationInfo(trip.id, { sections: result.sections }))
         .catch(err => console.error("Failed to generate destination info:", err)),
 
-      // Generate itinerary
-      handleAi({ action: "generate_itinerary", tripProfile: { ...tripProfile, numberOfDays: trip.numberOfDays }, userLanguage })
-        .then((result: any) => saveItinerary(trip.id, { days: result.days }))
-        .catch(err => console.error("Failed to generate itinerary:", err)),
+      // NOTE: Itinerary is no longer auto-generated. User will generate it manually via wizard.
     ]);
 
     res.status(201).json(trip);
@@ -517,7 +514,7 @@ app.get("/trips/:tripId/itinerary", requireAuth, async (req, res) => {
   }
 });
 
-// POST /trips/:tripId/itinerary/regenerate - Regenerate itinerary
+// POST /trips/:tripId/itinerary/regenerate - Regenerate itinerary with optional preferences
 app.post("/trips/:tripId/itinerary/regenerate", requireAuth, async (req, res) => {
   try {
     const tripId = req.params.tripId as string;
@@ -527,6 +524,10 @@ app.post("/trips/:tripId/itinerary/regenerate", requireAuth, async (req, res) =>
     }
 
     const userLanguage = getUserLanguage(req);
+    
+    // Extract preferences from request body (optional)
+    const { preferences } = req.body;
+    
     const tripProfile = {
       destination: trip.destination,
       startDate: trip.startDate || undefined,
@@ -540,6 +541,10 @@ app.post("/trips/:tripId/itinerary/regenerate", requireAuth, async (req, res) =>
         ageGroup: t.ageGroup,
         notes: t.notes,
       })),
+      // Add user preferences if provided
+      ...(preferences && {
+        itineraryPreferences: preferences
+      }),
     };
 
     const result = await handleAi({ action: "generate_itinerary", tripProfile, userLanguage });
