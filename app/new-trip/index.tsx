@@ -263,6 +263,7 @@ export default function NewTripScreen() {
               value={startDate || new Date()}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              locale="fr-FR"
               onChange={(event, selectedDate) => {
                 setShowStartPicker(Platform.OS === 'ios');
                 if (selectedDate) {
@@ -289,6 +290,7 @@ export default function NewTripScreen() {
               value={endDate || startDate || new Date()}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              locale="fr-FR"
               minimumDate={startDate || undefined}
               onChange={(event, selectedDate) => {
                 setShowEndPicker(Platform.OS === 'ios');
